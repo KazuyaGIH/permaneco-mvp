@@ -67,6 +67,9 @@ jobs:
         working-directory: frontend
 
   secrets:
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
