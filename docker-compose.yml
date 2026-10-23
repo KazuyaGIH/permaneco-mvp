@@ -37,6 +37,7 @@ services:
       APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
       LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       LLM_MODEL_MAIN: ${LLM_MODEL_MAIN:-gemini-3.6-flash}
+      LLM_MODEL_MAIN_FALLBACKS: ${LLM_MODEL_MAIN_FALLBACKS:-gemini-3.5-flash-lite}
       LLM_MODEL_FAST: ${LLM_MODEL_FAST:-gemini-3.5-flash-lite}
       LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}

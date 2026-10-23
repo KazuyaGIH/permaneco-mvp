@@ -19,6 +19,7 @@ class ToolCall:
     args: dict[str, Any]
     call_id: str | None = None
     provider_data: dict[str, Any] | None = None
+    model: str | None = None
 
 
 @dataclass(frozen=True)
@@ -42,7 +43,11 @@ class StructuredOutputError(RuntimeError):
 
 class LLMProvider(Protocol):
     def stream_chat(
-        self, system: str, messages: list[ChatMessage], tools: list[ToolSpec]
+        self,
+        system: str,
+        messages: list[ChatMessage],
+        tools: list[ToolSpec],
+        model: str | None = None,
     ) -> Iterator[LLMEvent]: ...
 
     def generate_json(
@@ -56,7 +61,11 @@ class LLMProvider(Protocol):
 
 class ProviderBase:
     def stream_chat(
-        self, system: str, messages: list[ChatMessage], tools: list[ToolSpec]
+        self,
+        system: str,
+        messages: list[ChatMessage],
+        tools: list[ToolSpec],
+        model: str | None = None,
     ) -> Iterator[LLMEvent]:
         raise NotImplementedError
 

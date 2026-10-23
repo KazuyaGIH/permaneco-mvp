@@ -19,6 +19,7 @@ def get_provider():
             settings.llm_model_main,
             settings.llm_model_fast,
             settings.llm_timeout_seconds,
+            settings.llm_model_main_fallbacks,
         )
     if settings.llm_provider == "openai":
         if not settings.openai_api_key:

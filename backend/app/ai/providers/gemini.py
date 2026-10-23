@@ -1,11 +1,15 @@
 import json
+import logging
 from collections import OrderedDict
+from datetime import date
+from threading import Lock
 from typing import Any, Literal
 
 from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
+from app.core.clock import SystemClock
 from app.ai.providers.base import (
     ChatMessage,
     ProviderBase,
@@ -18,6 +22,8 @@ from app.ai.providers.base import (
     retry_delay,
 )
 
+logger = logging.getLogger("app.ai")
+
 
 class GeminiProvider(ProviderBase):
     def __init__(
@@ -26,6 +32,7 @@ class GeminiProvider(ProviderBase):
         model_main: str,
         model_fast: str,
         timeout_seconds: int = 30,
+        model_main_fallbacks: tuple[str, ...] = (),
     ):
         retry_options = types.HttpRetryOptions(attempts=1, http_status_codes=[])
         self.client = genai.Client(
@@ -36,9 +43,67 @@ class GeminiProvider(ProviderBase):
         )
         self.model_main = model_main
         self.model_fast = model_fast
+        self.model_main_fallbacks = tuple(
+            candidate
+            for candidate in dict.fromkeys(
+                fallback.strip() for fallback in model_main_fallbacks if fallback.strip()
+            )
+            if candidate != model_main
+        )
+        self._exhausted_models: dict[str, date] = {}
+        self._quota_lock = Lock()
 
     def _model(self, model: Literal["fast", "main"]) -> str:
         return self.model_fast if model == "fast" else self.model_main
+
+    @staticmethod
+    def _is_resource_exhausted(error: Exception) -> bool:
+        current: BaseException | None = error
+        visited: set[int] = set()
+        while current is not None and id(current) not in visited:
+            visited.add(id(current))
+            code = getattr(current, "code", None)
+            status = getattr(current, "status", None)
+            details = getattr(current, "details", None)
+            if isinstance(details, dict):
+                api_error = details.get("error", {})
+                if isinstance(api_error, dict):
+                    code = code or api_error.get("code")
+                    status = status or api_error.get("status")
+                code = code or details.get("code")
+                status = status or details.get("status")
+            response = getattr(current, "response", None)
+            code = (
+                code
+                or getattr(current, "status_code", None)
+                or getattr(response, "status_code", None)
+            )
+            try:
+                status_value = getattr(status, "value", status)
+                status_text = str(status_value).rsplit(".", 1)[-1].upper()
+                if int(code) == 429 and status_text == "RESOURCE_EXHAUSTED":
+                    return True
+            except (TypeError, ValueError):
+                pass
+            current = current.__cause__ or current.__context__
+        return False
+
+    def _is_model_exhausted(self, model: str) -> bool:
+        with self._quota_lock:
+            return self._exhausted_models.get(model) == SystemClock().now().date()
+
+    def _mark_model_exhausted(self, model: str) -> None:
+        with self._quota_lock:
+            self._exhausted_models[model] = SystemClock().now().date()
+
+    def _available_main_models(self) -> list[str]:
+        candidates = list(dict.fromkeys((self.model_main, *self.model_main_fallbacks)))
+        available = [
+            candidate for candidate in candidates if not self._is_model_exhausted(candidate)
+        ]
+        if available and available[0] != self.model_main:
+            logger.info("model_fallback from=%s to=%s", self.model_main, available[0])
+        return available
 
     def _contents(self, messages: list[ChatMessage]) -> list[types.Content]:
         contents: list[types.Content] = []
@@ -138,9 +203,25 @@ class GeminiProvider(ProviderBase):
         ]
         return [types.Tool(function_declarations=declarations)]
 
-    def stream_chat(self, system: str, messages: list[ChatMessage], tools: list[ToolSpec]):
+    def stream_chat(
+        self,
+        system: str,
+        messages: list[ChatMessage],
+        tools: list[ToolSpec],
+        model: str | None = None,
+    ):
+        pinned_model = model is not None
+        candidate_models = [model] if pinned_model else self._available_main_models()
+        if not candidate_models:
+            raise ProviderUnavailableError("O provedor de IA está indisponível.")
+        model_index = 0
+        retry_attempt = 0
         emitted = False
-        for attempt in range(3):
+        while model_index < len(candidate_models):
+            selected_model = candidate_models[model_index]
+            if not pinned_model and self._is_model_exhausted(selected_model):
+                model_index += 1
+                continue
             calls: OrderedDict[str, dict[str, Any]] = OrderedDict()
             call_names: dict[str, str] = {}
             call_ids: dict[str, str | None] = {}
@@ -149,7 +230,7 @@ class GeminiProvider(ProviderBase):
             usage: Usage | None = None
             try:
                 stream = self.client.models.generate_content_stream(
-                    model=self.model_main,
+                    model=selected_model,
                     contents=self._contents(messages),
                     config=types.GenerateContentConfig(
                         system_instruction=system,
@@ -215,15 +296,36 @@ class GeminiProvider(ProviderBase):
                         provider_data=(
                             {"thought_signature": signature} if signature is not None else None
                         ),
+                        model=selected_model,
                     )
                 if usage:
                     yield usage
                 return
             except Exception as error:
-                if is_retryable_error(error) and attempt < 2 and not emitted:
-                    retry_delay(attempt)
+                if self._is_resource_exhausted(error):
+                    self._mark_model_exhausted(selected_model)
+                    if not pinned_model and not emitted:
+                        next_index = model_index + 1
+                        while next_index < len(candidate_models) and self._is_model_exhausted(
+                            candidate_models[next_index]
+                        ):
+                            next_index += 1
+                        if next_index < len(candidate_models):
+                            logger.info(
+                                "model_fallback from=%s to=%s",
+                                selected_model,
+                                candidate_models[next_index],
+                            )
+                            model_index = next_index
+                            retry_attempt = 0
+                            continue
+                    raise ProviderUnavailableError("O provedor de IA está indisponível.") from error
+                if is_retryable_error(error) and retry_attempt < 2 and not emitted:
+                    retry_delay(retry_attempt)
+                    retry_attempt += 1
                     continue
                 raise ProviderUnavailableError("O provedor de IA está indisponível.") from error
+        raise ProviderUnavailableError("O provedor de IA está indisponível.")
 
     def _generate_json_text(
         self,
@@ -232,10 +334,24 @@ class GeminiProvider(ProviderBase):
         schema: type[BaseModel],
         model: Literal["fast", "main"],
     ) -> str:
-        for attempt in range(3):
+        main_model_request = model == "main"
+        candidate_models = (
+            self._available_main_models() if main_model_request else [self._model(model)]
+        )
+        if not candidate_models or (
+            not main_model_request and self._is_model_exhausted(self.model_fast)
+        ):
+            raise ProviderUnavailableError("O provedor de IA está indisponível.")
+        model_index = 0
+        retry_attempt = 0
+        while model_index < len(candidate_models):
+            selected_model = candidate_models[model_index]
+            if main_model_request and self._is_model_exhausted(selected_model):
+                model_index += 1
+                continue
             try:
                 response = self.client.models.generate_content(
-                    model=self._model(model),
+                    model=selected_model,
                     contents=prompt,
                     config=types.GenerateContentConfig(
                         system_instruction=system,
@@ -248,8 +364,27 @@ class GeminiProvider(ProviderBase):
                     return parsed.model_dump_json()
                 return response.text or ""
             except Exception as error:
-                if is_retryable_error(error) and attempt < 2:
-                    retry_delay(attempt)
+                if self._is_resource_exhausted(error):
+                    self._mark_model_exhausted(selected_model)
+                    if main_model_request:
+                        next_index = model_index + 1
+                        while next_index < len(candidate_models) and self._is_model_exhausted(
+                            candidate_models[next_index]
+                        ):
+                            next_index += 1
+                        if next_index < len(candidate_models):
+                            logger.info(
+                                "model_fallback from=%s to=%s",
+                                selected_model,
+                                candidate_models[next_index],
+                            )
+                            model_index = next_index
+                            retry_attempt = 0
+                            continue
+                    raise ProviderUnavailableError("O provedor de IA está indisponível.") from error
+                if is_retryable_error(error) and retry_attempt < 2:
+                    retry_delay(retry_attempt)
+                    retry_attempt += 1
                     continue
                 raise ProviderUnavailableError("O provedor de IA está indisponível.") from error
         raise ProviderUnavailableError("O provedor de IA está indisponível.")

@@ -482,6 +482,30 @@ def test_tool_provider_data_round_trips_to_next_provider_request(db_session, stu
     )
 
 
+def test_pipeline_pins_model_selected_for_tool_call_across_rounds(db_session, student_case):
+    _, profile, conversation = student_case
+    fallback_model = "gemini-3.5-flash-lite"
+    provider = FakeLLMProvider(
+        stream_responses=[
+            [
+                ToolCall(
+                    "search_knowledge",
+                    {"query": "apoio"},
+                    model=fallback_model,
+                )
+            ],
+            "Resposta concluída.",
+        ]
+    )
+
+    events = list(
+        stream_message(db_session, conversation, profile, "apoio", provider, FixedClock(FIXED_NOW))
+    )
+
+    assert provider.stream_models == [None, fallback_model]
+    assert all("model" not in event for event in events)
+
+
 def test_pipeline_provider_failure_preserves_student_message(db_session, student_case):
     student, profile, conversation = student_case
     events = list(

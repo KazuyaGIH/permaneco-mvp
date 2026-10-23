@@ -219,12 +219,18 @@ def stream_message(
     output_tokens = 0
     try:
         llm = provider() if callable(provider) else provider
+        turn_model = None
         for _ in range(5):
             round_text: list[str] = []
             round_text_parts: list[dict] = []
             has_text_provider_data = False
             calls: list[ToolCall] = []
-            for event in llm.stream_chat(system, messages, tool_specs()):
+            stream = (
+                llm.stream_chat(system, messages, tool_specs())
+                if turn_model is None
+                else llm.stream_chat(system, messages, tool_specs(), model=turn_model)
+            )
+            for event in stream:
                 if isinstance(event, TextDelta):
                     round_text.append(event.text)
                     text_part = {"text": event.text}
@@ -249,6 +255,8 @@ def stream_message(
                             stream_buffer = stream_buffer[safe_length:]
                 elif isinstance(event, ToolCall):
                     calls.append(event)
+                    if event.model is not None:
+                        turn_model = event.model
                 elif isinstance(event, Usage):
                     input_tokens += event.input_tokens
                     output_tokens += event.output_tokens

@@ -12,7 +12,7 @@
 
 ## M2 — núcleo de IA
 
-- Os modelos padrão são `gemini-3.6-flash` para conversas e planos e `gemini-3.5-flash-lite` para tarefas rápidas. Foram escolhidos por estarem disponíveis sem cobrança no nível gratuito validado, permitindo testar o MVP sem créditos pagos.
+- Os modelos padrão são `gemini-3.6-flash` para conversas e planos e `gemini-3.5-flash-lite` para tarefas rápidas. O nível gratuito de `gemini-3.6-flash` limita esse modelo a 20 requisições por dia por projeto, conforme a cota `GenerateRequestsPerDayPerProjectPerModel-FreeTier`. Por isso, `LLM_MODEL_MAIN_FALLBACKS` usa `gemini-3.5-flash-lite` quando a cota diária do modelo principal se esgota; a configuração continua limitada a modelos gratuitos para permitir testar o MVP sem créditos pagos.
 - A resposta em streaming libera apenas deltas já seguros e mantém um trecho final em espera para detectar um canário dividido entre chunks. Ao terminar, o texto completo passa pela sanitização e é enviado como `replace`, garantindo que o conteúdo persistido e o exibido coincidam.
 - A base de conhecimento guarda texto simples com busca `tsvector` em português: seu conteúdo curado é público e não é dado pessoal. Conteúdo pessoal continua cifrado.
 - O encerramento da conversa usa `BackgroundTasks` do FastAPI para resumo, próximos passos, extração consentida de memórias e geração do plano sem bloquear a resposta da rota.

@@ -63,7 +63,13 @@ class OpenAIProvider(ProviderBase):
             for tool in tools
         ]
 
-    def stream_chat(self, system: str, messages: list[ChatMessage], tools: list[ToolSpec]):
+    def stream_chat(
+        self,
+        system: str,
+        messages: list[ChatMessage],
+        tools: list[ToolSpec],
+        model: str | None = None,
+    ):
         emitted = False
         for attempt in range(3):
             tool_calls: OrderedDict[int, dict] = OrderedDict()

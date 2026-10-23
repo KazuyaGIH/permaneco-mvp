@@ -26,10 +26,18 @@ class FakeLLMProvider(ProviderBase):
         self.json_responses = deque(json_responses)
         self.down = down
         self.stream_calls: list[list[ChatMessage]] = []
+        self.stream_models: list[str | None] = []
 
-    def stream_chat(self, system: str, messages: list[ChatMessage], tools: list[ToolSpec]):
+    def stream_chat(
+        self,
+        system: str,
+        messages: list[ChatMessage],
+        tools: list[ToolSpec],
+        model: str | None = None,
+    ):
         del system, tools
         self.stream_calls.append(deepcopy(messages))
+        self.stream_models.append(model)
         if self.down:
             raise ProviderUnavailableError("O provedor de IA está indisponível.")
         response = (
