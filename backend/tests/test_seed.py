@@ -3,7 +3,15 @@ from argon2 import PasswordHasher
 from sqlalchemy import func, select
 
 from app.core.config import settings
-from app.models import StudentProfile, TutorAssignment, User
+from app.models import (
+    AppSetting,
+    DemoClockSetting,
+    KnowledgeItem,
+    StudentIdentity,
+    StudentProfile,
+    TutorAssignment,
+    User,
+)
 from app.seed import seed_database
 
 
@@ -20,11 +28,38 @@ def test_seed_is_idempotent_and_creates_required_personas(db_session, monkeypatc
     monkeypatch.setattr(settings, "demo_password", "demo-only-test-password")
 
     seed_database(db_session)
+    seeded_counts = tuple(
+        db_session.scalar(select(func.count()).select_from(model))
+        for model in (
+            User,
+            StudentIdentity,
+            StudentProfile,
+            TutorAssignment,
+            DemoClockSetting,
+            AppSetting,
+            KnowledgeItem,
+        )
+    )
     ana = db_session.scalar(select(User).where(User.email == "ana@example.com"))
     ana.password_hash = PasswordHasher().hash("stale-password")
     db_session.commit()
     seed_database(db_session)
 
+    assert (
+        tuple(
+            db_session.scalar(select(func.count()).select_from(model))
+            for model in (
+                User,
+                StudentIdentity,
+                StudentProfile,
+                TutorAssignment,
+                DemoClockSetting,
+                AppSetting,
+                KnowledgeItem,
+            )
+        )
+        == seeded_counts
+    )
     assert db_session.scalar(select(func.count()).select_from(User)) == 34
     assert db_session.scalar(select(func.count()).select_from(TutorAssignment)) == 30
     ana = db_session.scalar(select(User).where(User.email == "ana@example.com"))

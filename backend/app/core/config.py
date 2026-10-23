@@ -2,6 +2,13 @@ import os
 from dataclasses import dataclass
 
 
+def normalize_database_url(value: str) -> str:
+    for scheme in ("postgres://", "postgresql://"):
+        if value.startswith(scheme):
+            return f"postgresql+psycopg://{value.removeprefix(scheme)}"
+    return value
+
+
 def _env_bool(name: str, default: bool) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -14,9 +21,11 @@ def _env_bool(name: str, default: bool) -> bool:
 
 @dataclass
 class Settings:
-    database_url: str = os.getenv(
-        "DATABASE_URL",
-        "postgresql+psycopg://permaneco@localhost:5432/permaneco",
+    database_url: str = normalize_database_url(
+        os.getenv(
+            "DATABASE_URL",
+            "postgresql+psycopg://permaneco@localhost:5432/permaneco",
+        )
     )
     demo_mode: bool = _env_bool("DEMO_MODE", False)
     cookie_secure: bool = _env_bool("COOKIE_SECURE", True)
