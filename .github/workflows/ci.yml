@@ -37,6 +37,9 @@ jobs:
           python-version: "3.12.10"
           cache: pip
           cache-dependency-path: backend/requirements.txt
+      - name: Configure test encryption key
+        run: >-
+          python -c 'import base64, secrets; print("DATA_ENCRYPTION_KEY=" + base64.b64encode(secrets.token_bytes(32)).decode())' >> "$GITHUB_ENV"
       - run: python -m pip install -r backend/requirements.txt
       - run: alembic upgrade head
         working-directory: backend
