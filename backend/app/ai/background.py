@@ -7,11 +7,13 @@ from pathlib import Path
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.ai.context import escape_context_text
 from app.ai.plans import build_plan_prompt, current_plan, generate_valid_plan
 from app.ai.providers.base import ProviderUnavailableError, StructuredOutputError
 from app.ai.providers.factory import get_provider
 from app.core.clock import DemoClock
 from app.core.config import settings
+from app.core.timezone import format_app_datetime
 from app.db.session import SessionLocal
 from app.models import (
     Checkin,
@@ -111,9 +113,9 @@ def _extract_memory(
     prompt_template = (PROMPTS_DIR / "memory_extractor.md").read_text(encoding="utf-8")
     prompt = "\n\n".join(
         (
-            f"<conversa>\n{transcript}\n</conversa>",
-            f"<memorias_existentes>\n{json.dumps([item.content for item in existing], ensure_ascii=False)}\n</memorias_existentes>",
-            f"<perfil_do_aluno>\n{json.dumps(_profile_values(profile), ensure_ascii=False)}\n</perfil_do_aluno>",
+            f"<conversa>\n{escape_context_text(transcript)}\n</conversa>",
+            f"<memorias_existentes>\n{escape_context_text(json.dumps([item.content for item in existing], ensure_ascii=False))}\n</memorias_existentes>",
+            f"<perfil_do_aluno>\n{escape_context_text(json.dumps(_profile_values(profile), ensure_ascii=False))}\n</perfil_do_aluno>",
         )
     )
     try:
@@ -192,7 +194,14 @@ def _save_plan(
         return
     knowledge = list(db.scalars(select(KnowledgeItem).where(KnowledgeItem.is_active.is_(True))))
     current_content = current.content if current else ""
-    prompt = build_plan_prompt(profile, memories, knowledge, current_content, requested_change)
+    prompt = build_plan_prompt(
+        profile,
+        memories,
+        knowledge,
+        current_content,
+        requested_change,
+        format_app_datetime(_clock(db).now()),
+    )
     system = (PROMPTS_DIR / "plan_generator.md").read_text(encoding="utf-8")
     try:
         plan = generate_valid_plan(provider, system, prompt, profile, db)
@@ -255,7 +264,13 @@ def process_conversation_end(conversation_id: str, student_id: str) -> None:
             try:
                 summary = provider.generate_json(
                     summary_prompt,
-                    f"<conversa>\n{transcript}\n</conversa>",
+                    "\n\n".join(
+                        (
+                            f"<data_e_hora_atual>\n{format_app_datetime(clock.now())}"
+                            "\n</data_e_hora_atual>",
+                            f"<conversa>\n{escape_context_text(transcript)}\n</conversa>",
+                        )
+                    ),
                     SummarySchema,
                     model="fast",
                 )

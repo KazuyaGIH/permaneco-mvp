@@ -1,7 +1,6 @@
 import json
 import re
 import secrets
-from datetime import timezone
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +8,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.clock import Clock
+from app.core.timezone import format_app_datetime
 from app.models import (
     Conversation,
     Consent,
@@ -35,6 +35,9 @@ _CONTEXT_TAGS = (
     "proximos_passos",
     "plano_atual",
     "base_de_conhecimento",
+    "conversa",
+    "memorias_existentes",
+    "pedido_de_mudanca",
 )
 _TAG_PATTERN = re.compile(rf"<\s*/?\s*(?:{'|'.join(_CONTEXT_TAGS)})(?=\s|/?>)", re.IGNORECASE)
 
@@ -163,7 +166,7 @@ def build_context(
     blocks = [
         _block("tipo_de_conversa", conversation.kind),
         _block("canal", conversation.channel),
-        _block("data_e_hora_atual", clock.now().astimezone(timezone.utc).isoformat()),
+        _block("data_e_hora_atual", format_app_datetime(clock.now())),
         _block("perfil_do_aluno", json.dumps(profile_data, ensure_ascii=False)),
         _block("memorias", "\n".join(memory_values)),
         _block("resumo_da_ultima_conversa", summary.content if summary else ""),

@@ -34,6 +34,7 @@ services:
       LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
       RETENTION_DAYS: ${RETENTION_DAYS:-90}
       MAX_DAILY_TOKENS_PER_STUDENT: ${MAX_DAILY_TOKENS_PER_STUDENT:-25000}
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
       LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       LLM_MODEL_MAIN: ${LLM_MODEL_MAIN:-gemini-3.6-flash}
       LLM_MODEL_FAST: ${LLM_MODEL_FAST:-gemini-3.5-flash-lite}
@@ -60,6 +61,7 @@ services:
       DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?Configure DATA_ENCRYPTION_KEY in .env}
       DATA_ENCRYPTION_KEYS: ${DATA_ENCRYPTION_KEYS:-}
       DATA_ENCRYPTION_KEY_ID: ${DATA_ENCRYPTION_KEY_ID:-default}
+      APP_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
     depends_on:
       backend:
         condition: service_healthy

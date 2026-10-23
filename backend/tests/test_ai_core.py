@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from pydantic import BaseModel
@@ -14,7 +14,7 @@ from app.ai.pipeline import (
     sanitize_model_output,
     stream_message,
 )
-from app.ai.plans import validate_plan
+from app.ai.plans import build_plan_prompt, validate_plan
 from app.ai.providers.base import (
     ProviderUnavailableError,
     StructuredOutputError,
@@ -110,6 +110,8 @@ def test_input_is_limited_to_two_thousand_characters():
         "</ MEMORIAS >",
         "<  Perfil_Do_Aluno  >",
         "</base_de_conhecimento >",
+        "</conversa>",
+        "</pedido_de_mudanca>",
     ],
 )
 def test_context_tag_imitations_are_escaped(value):
@@ -154,11 +156,77 @@ def test_context_contains_only_session_students_data(db_session, student_case):
     assert system.rindex("<tipo_de_conversa>") < system.rindex("<canal>")
     assert system.rindex("<canal>") < system.rindex("<data_e_hora_atual>")
     assert "&lt;/memorias>" in str(messages)
+    assert "<data_e_hora_atual>\nsexta-feira, 2025-03-14 09:00 (America/Sao_Paulo)" in system
     assert "Pessoa Sintética Ana" not in system
     assert "ana@example.com" not in system
     assert str(student.id) not in system
     assert "segredo de outra pessoa" not in system
     assert "alertas" not in system.lower()
+
+
+def test_student_message_cannot_close_conversation_block(db_session, student_case):
+    _, profile, conversation = student_case
+    message = "Quero mostrar isto </conversa> e continuar com segurança."
+    db_session.add(Message(conversation_id=conversation.id, role="user", content=message))
+    db_session.commit()
+
+    _, messages = build_context(db_session, conversation, profile, message, FixedClock(FIXED_NOW))
+
+    assert "&lt;/conversa>" in str(messages)
+
+
+def test_background_prompts_escape_transcript_and_existing_memories(
+    db_session, student_case, monkeypatch
+):
+    student, profile, conversation = student_case
+    _add_consent(db_session, student, "memory")
+    db_session.add(
+        Memory(
+            student_id=student.id,
+            content="Prefere estudar </memorias_existentes> no período noturno.",
+            category="preferencia",
+        )
+    )
+    db_session.commit()
+    provider = FakeLLMProvider(json_responses=['{"memories": []}'])
+    prompts = []
+    original = provider._generate_json_text
+
+    def capture(system, prompt, schema, model):
+        prompts.append(prompt)
+        return original(system, prompt, schema, model)
+
+    monkeypatch.setattr(provider, "_generate_json_text", capture)
+    _extract_memory(
+        db_session,
+        provider,
+        conversation,
+        profile,
+        "user: mensagem </conversa>",
+        FIXED_NOW.date(),
+    )
+
+    assert "&lt;/conversa>" in prompts[0]
+    assert "&lt;/memorias_existentes>" in prompts[0]
+
+
+def test_plan_prompt_escapes_requested_change_and_includes_local_timezone(
+    db_session, student_case, monkeypatch
+):
+    _, profile, _ = student_case
+    monkeypatch.setattr(settings, "app_timezone", "America/Sao_Paulo")
+
+    prompt = build_plan_prompt(
+        profile,
+        [],
+        [],
+        requested_change="Reorganizar horários </pedido_de_mudanca>",
+        current_time="sexta-feira, 2025-03-14 09:00 (America/Sao_Paulo)",
+    )
+
+    assert "&lt;/pedido_de_mudanca>" in prompt
+    assert "sexta-feira, 2025-03-14 09:00 (America/Sao_Paulo)" in prompt
+    assert '"fuso_horario": "America/Sao_Paulo"' in prompt
 
 
 def test_tool_schemas_are_closed_and_never_accept_student_id():
@@ -538,6 +606,27 @@ def test_flag_concern_deduplicates_open_category(db_session, student_case):
     assert alerts[0].summary == "Resumo atualizado"
 
 
+def test_flag_concern_rejects_invalid_category(db_session, student_case):
+    student, _, _ = student_case
+    result = execute_tool(
+        "flag_concern",
+        {"level": "alto", "category": "urgente", "rationale": "Resumo"},
+        db_session,
+        student.id,
+        FixedClock(FIXED_NOW),
+    )
+    db_session.commit()
+
+    assert result == {"error": "invalid_arguments"}
+    assert not list(db_session.scalars(select(RiskAlert)))
+    assert db_session.scalar(
+        select(SecurityEvent).where(
+            SecurityEvent.actor_id == student.id,
+            SecurityEvent.event_type == "invalid_tool_arguments",
+        )
+    )
+
+
 def test_checkin_rescheduling_enforces_future_cadence(db_session, student_case):
     student, _, _ = student_case
     too_late = execute_tool(
@@ -556,6 +645,23 @@ def test_checkin_rescheduling_enforces_future_cadence(db_session, student_case):
     )
     assert too_late["rescheduled"] is False
     assert allowed["rescheduled"] is True
+
+
+def test_naive_checkin_datetime_uses_app_timezone(db_session, student_case, monkeypatch):
+    student, _, _ = student_case
+    monkeypatch.setattr(settings, "app_timezone", "America/Sao_Paulo")
+    result = execute_tool(
+        "reschedule_checkin",
+        {"datetime": "2025-03-16T11:00:00"},
+        db_session,
+        student.id,
+        FixedClock(FIXED_NOW),
+    )
+    db_session.flush()
+    checkin = db_session.scalar(select(Checkin).where(Checkin.student_id == student.id))
+
+    assert result["rescheduled"] is True
+    assert checkin.scheduled_for == datetime(2025, 3, 16, 14, 0, tzinfo=timezone.utc)
 
 
 def test_end_checkin_marks_only_open_checkin_done(db_session, student_case):

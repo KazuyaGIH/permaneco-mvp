@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -8,6 +9,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.clock import Clock
+from app.core.config import settings
 from app.models import (
     Checkin,
     KnowledgeItem,
@@ -47,7 +49,16 @@ class RescheduleCheckinArguments(StrictArguments):
 
 class FlagConcernArguments(StrictArguments):
     level: Literal["alto", "crise"]
-    category: str = Field(min_length=2, max_length=64)
+    category: Literal[
+        "financeiro",
+        "tempo_trabalho",
+        "desempenho",
+        "intencao_de_desistir",
+        "saude_emocional",
+        "familia",
+        "acesso_tecnologia",
+        "risco_a_vida",
+    ]
     rationale: str = Field(min_length=1, max_length=500)
 
 
@@ -168,10 +179,11 @@ def execute_tool(
     if name == "reschedule_checkin":
         proposed = args.datetime
         if proposed.tzinfo is None:
-            proposed = proposed.replace(tzinfo=timezone.utc)
+            proposed = proposed.replace(tzinfo=ZoneInfo(settings.app_timezone))
         now = clock.now()
         if now.tzinfo is None:
             now = now.replace(tzinfo=timezone.utc)
+        now = now.astimezone(ZoneInfo(settings.app_timezone))
         if proposed <= now:
             return {"rescheduled": False, "reason": "not_future"}
         profile = db.scalar(select(StudentProfile).where(StudentProfile.user_id == student_id))

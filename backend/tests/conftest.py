@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
+import tests._test_database  # noqa: F401
 from app.core.clock import FixedClock
 from app.core.config import settings
 from app.db.base import Base

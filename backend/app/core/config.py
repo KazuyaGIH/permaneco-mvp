@@ -25,6 +25,7 @@ class Settings:
     demo_password: str = os.getenv("DEMO_PASSWORD", "")
     retention_days: int = int(os.getenv("RETENTION_DAYS", "90"))
     max_daily_tokens_per_student: int = int(os.getenv("MAX_DAILY_TOKENS_PER_STUDENT", "25000"))
+    app_timezone: str = os.getenv("APP_TIMEZONE", "America/Sao_Paulo")
     llm_provider: str = os.getenv("LLM_PROVIDER", "gemini")
     llm_model_main: str = os.getenv("LLM_MODEL_MAIN", "gemini-3.6-flash")
     llm_model_fast: str = os.getenv("LLM_MODEL_FAST", "gemini-3.5-flash-lite")

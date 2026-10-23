@@ -26,6 +26,7 @@ jobs:
           --health-retries 12
     env:
       DATABASE_URL: postgresql+psycopg://permaneco:permaneco@127.0.0.1:5432/permaneco
+      TEST_DATABASE_URL: postgresql+psycopg://permaneco:permaneco@127.0.0.1:5432/permaneco_test
       DEMO_MODE: "true"
       DEMO_PASSWORD: demo-only-password
       COOKIE_SECURE: "false"

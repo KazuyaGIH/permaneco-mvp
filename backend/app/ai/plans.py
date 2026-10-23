@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 
 from app.ai.context import escape_context_text
 from app.ai.providers.base import LLMProvider, StructuredOutputError
+from app.core.clock import SystemClock
+from app.core.config import settings
+from app.core.timezone import format_app_datetime
 from app.models import KnowledgeItem, Plan, StudentProfile
 from app.schemas.ai import PlanSchema
 
@@ -48,6 +51,7 @@ def build_plan_prompt(
     knowledge: list[KnowledgeItem],
     current_plan: str = "",
     requested_change: str = "",
+    current_time: str | None = None,
 ) -> str:
     profile_block = {
         "nome_preferido": profile.preferred_name,
@@ -57,6 +61,7 @@ def build_plan_prompt(
         "horas_de_trabalho_semanais": profile.work_hours_week,
         "trabalha": profile.works,
         "horario_preferido": profile.preferred_time,
+        "fuso_horario": settings.app_timezone,
     }
     knowledge_block = [
         {
@@ -68,8 +73,10 @@ def build_plan_prompt(
         }
         for item in knowledge
     ]
+    local_time = current_time or format_app_datetime(SystemClock().now())
     return "\n\n".join(
         (
+            f"<data_e_hora_atual>\n{escape_context_text(local_time)}\n</data_e_hora_atual>",
             f"<perfil_do_aluno>\n{escape_context_text(json.dumps(profile_block, ensure_ascii=False))}\n</perfil_do_aluno>",
             f"<memorias>\n{escape_context_text(json.dumps(memories, ensure_ascii=False))}\n</memorias>",
             f"<plano_atual>\n{escape_context_text(current_plan)}\n</plano_atual>",
