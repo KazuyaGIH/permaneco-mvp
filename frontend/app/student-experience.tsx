@@ -306,23 +306,35 @@ export default function StudentExperience() {
   }
 
   return (
-    <main className="page-shell">
-      <section className="panel" aria-labelledby="student-title">
-        <h1 className="display-title" id="student-title">Seu espaço de estudos</h1>
-        {!profile || !consents ? (
-          <p className="lead">Carregando…</p>
-        ) : (
-          <>
-            <p className="lead">
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="app-header-inner">
+          <span className="wordmark">Permaneço</span>
+          <div className="ia-indicator ia-indicator-inline" aria-label="Mentora de inteligência artificial">
+            <span className="ia-dot" aria-hidden="true" /> IA
+          </div>
+        </div>
+      </header>
+      <main className="app-main" aria-labelledby="student-title">
+        <div className="student-heading">
+          <h1 className="page-title" id="student-title">Seu espaço de estudos</h1>
+          {profile && consents && (
+            <p className="page-meta">
               Olá, {profile.preferred_name}. {profile.course} · {profile.semester}º semestre.
             </p>
-            {notice && <p role="status">{notice}</p>}
+          )}
+        </div>
+        {!profile || !consents ? (
+          <p className="page-meta">Carregando…</p>
+        ) : (
+          <>
+            {notice && <p className="notice" role="status">{notice}</p>}
             {consents.minor_message ? (
-              <p className="account-card">{consents.minor_message}</p>
+              <p className="surface-card">{consents.minor_message}</p>
             ) : !consents.chat_allowed ? (
-              <form className="account-card" onSubmit={saveConsents}>
-                <h2>Antes de começar</h2>
-                <p>Suas mensagens ficam protegidas. A mentora usa IA e não substitui o apoio da instituição.</p>
+              <form className="surface-card consent-card" onSubmit={saveConsents}>
+                <h2 className="section-title">Antes de começar</h2>
+                <p className="consent-intro">Suas mensagens ficam protegidas. A mentora usa IA e não substitui o apoio da instituição.</p>
                 <div className="consent-options">
                   <label className="consent-option">
                     <input type="checkbox" checked={ageConfirmed} onChange={(event) => setAgeConfirmed(event.target.checked)} />
@@ -369,24 +381,30 @@ export default function StudentExperience() {
                   aria-labelledby="student-tab-chat"
                   tabIndex={0}
                   hidden={tab !== "chat"}
-                  className="account-card tab-panel"
+                  className="tab-panel chat-panel"
                 >
                   <div ref={chatTranscriptRef} className="chat-transcript" aria-live="polite">
-                    {messages.map((message, index) => (
-                      <div
-                        key={`${index}-${message.role}`}
-                        className={`chat-bubble chat-bubble-${message.role}`}
-                      >
-                        <strong>{message.role === "user" ? "Você" : "Permaneço (IA)"}</strong>
-                        <p>{message.content}</p>
-                      </div>
-                    ))}
+                    {messages.length ? (
+                      messages.map((message, index) => (
+                        <div
+                          key={`${index}-${message.role}`}
+                          className={`chat-bubble chat-bubble-${message.role}`}
+                        >
+                          <strong className="bubble-author">{message.role === "user" ? "Você" : "Permaneço (IA)"}</strong>
+                          <p>{message.content}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="chat-empty">Escreva abaixo para começar uma conversa com a mentora.</p>
+                    )}
                   </div>
-                  <form onSubmit={sendMessage}>
+                  <form className="composer" onSubmit={sendMessage}>
                     <label className="field-label" htmlFor="chat-message">Sua mensagem</label>
-                    <textarea id="chat-message" maxLength={2000} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={busy} />
-                    <button className="primary-button" type="submit" disabled={busy || !draft.trim()}>Enviar</button>
-                    {conversationId && <button type="button" onClick={endConversation}>Encerrar conversa</button>}
+                    <textarea id="chat-message" className="text-input composer-input" rows={3} maxLength={2000} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={busy} />
+                    <div className="composer-actions">
+                      <button className="primary-button button-compact" type="submit" disabled={busy || !draft.trim()}>Enviar</button>
+                      {conversationId && <button className="secondary-button" type="button" onClick={endConversation}>Encerrar conversa</button>}
+                    </div>
                   </form>
                 </div>
                 <div
@@ -395,37 +413,47 @@ export default function StudentExperience() {
                   aria-labelledby="student-tab-plan"
                   tabIndex={0}
                   hidden={tab !== "plan"}
-                  className="account-card tab-panel"
+                  className="tab-panel plan-panel"
                 >
-                  <h2>Meu Plano</h2>
-                  {sections.map((item) => (
-                    <button
-                      key={item}
-                      type="button"
-                      className={`section-tab${section === item ? " is-active" : ""}`}
-                      onClick={() => setSection(item)}
-                      aria-pressed={section === item}
-                    >
-                      {sectionLabels[item]}
-                    </button>
-                  ))}
-                  {plan?.current?.plan?.[section] == null ? (
-                    <p>Seu plano ainda está sendo preparado.</p>
-                  ) : (
-                    <PlanContent value={plan.current.plan[section]} />
-                  )}
-                  <p>Confirme informações acadêmicas e financeiras com a instituição.</p>
-                  {plan?.sources.map((source) => {
-                    const href = safeLink(source.source_url);
-                    return href ? <p key={source.slug}><a href={href} rel="noreferrer">{source.title} — confirmar com a instituição</a></p> : null;
-                  })}
+                  <h2 className="section-title">Meu Plano</h2>
+                  <div className="segmented" role="group" aria-label="Seções do plano">
+                    {sections.map((item) => (
+                      <button
+                        key={item}
+                        type="button"
+                        className={`section-tab${section === item ? " is-active" : ""}`}
+                        onClick={() => setSection(item)}
+                        aria-pressed={section === item}
+                      >
+                        {sectionLabels[item]}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="surface-card">
+                    {plan?.current?.plan?.[section] == null ? (
+                      <p className="empty-state">Seu plano ainda está sendo preparado.</p>
+                    ) : (
+                      <PlanContent value={plan.current.plan[section]} />
+                    )}
+                  </div>
                   {proposals.map((proposal) => (
-                    <div key={proposal.id}>
+                    <div className="proposal-card" key={proposal.id}>
                       <p>Proposta de {proposal.section}: {proposal.change}</p>
-                      <button type="button" onClick={() => respondToProposal(proposal.id, "confirm")}>Confirmar</button>
-                      <button type="button" onClick={() => respondToProposal(proposal.id, "reject")}>Rejeitar</button>
+                      <div className="proposal-actions">
+                        <button className="primary-button button-compact" type="button" onClick={() => respondToProposal(proposal.id, "confirm")}>Confirmar</button>
+                        <button className="secondary-button" type="button" onClick={() => respondToProposal(proposal.id, "reject")}>Rejeitar</button>
+                      </div>
                     </div>
                   ))}
+                  <div className="plan-sources">
+                    <p className="plan-note">Confirme informações acadêmicas e financeiras com a instituição.</p>
+                    <ul className="source-list">
+                      {plan?.sources.map((source) => {
+                        const href = safeLink(source.source_url);
+                        return href ? <li key={source.slug}><a href={href} rel="noreferrer">{source.title} — confirmar com a instituição</a></li> : null;
+                      })}
+                    </ul>
+                  </div>
                 </div>
                 <div
                   id="student-panel-memories"
@@ -433,22 +461,27 @@ export default function StudentExperience() {
                   aria-labelledby="student-tab-memories"
                   tabIndex={0}
                   hidden={tab !== "memories"}
-                  className="account-card tab-panel"
+                  className="tab-panel"
                 >
-                  <h2>O que a Permaneço lembra de mim</h2>
-                  {memories.map((memory) => (
-                    <p key={memory.id}>{memory.content} <button type="button" onClick={() => forgetMemory(memory.id)}>Apagar</button></p>
-                  ))}
-                  {!memories.length && <p>Nenhuma memória ativa.</p>}
+                  <h2 className="section-title">O que a Permaneço lembra de mim</h2>
+                  {memories.length ? (
+                    <ul className="memory-list">
+                      {memories.map((memory) => (
+                        <li key={memory.id}>
+                          <span>{memory.content}</span>
+                          <button className="secondary-button" type="button" onClick={() => forgetMemory(memory.id)}>Apagar</button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="empty-state">Nenhuma memória ativa.</p>
+                  )}
                 </div>
               </>
             )}
           </>
         )}
-      </section>
-      <div className="ia-indicator" aria-label="Mentora de inteligência artificial">
-        <span className="ia-dot" aria-hidden="true" /> IA
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
