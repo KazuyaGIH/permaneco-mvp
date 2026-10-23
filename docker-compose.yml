@@ -1,0 +1,81 @@
+services:
+  db:
+    image: postgres:16.9-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-permaneco}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Configure DB_PASSWORD in .env}
+      POSTGRES_DB: ${DB_NAME:-permaneco}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-permaneco} -d ${DB_NAME:-permaneco}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DATABASE_URL: postgresql+psycopg://${DB_USER:-permaneco}:${DB_PASSWORD:?Configure DB_PASSWORD in .env}@db:5432/${DB_NAME:-permaneco}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?Configure DATA_ENCRYPTION_KEY in .env}
+      DATA_ENCRYPTION_KEYS: ${DATA_ENCRYPTION_KEYS:-}
+      DATA_ENCRYPTION_KEY_ID: ${DATA_ENCRYPTION_KEY_ID:-default}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
+      LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
+      RETENTION_DAYS: ${RETENTION_DAYS:-90}
+      MAX_DAILY_TOKENS_PER_STUDENT: ${MAX_DAILY_TOKENS_PER_STUDENT:-10000}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8000/api/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${DB_USER:-permaneco}:${DB_PASSWORD:?Configure DB_PASSWORD in .env}@db:5432/${DB_NAME:-permaneco}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      DATA_ENCRYPTION_KEY: ${DATA_ENCRYPTION_KEY:?Configure DATA_ENCRYPTION_KEY in .env}
+      DATA_ENCRYPTION_KEYS: ${DATA_ENCRYPTION_KEYS:-}
+      DATA_ENCRYPTION_KEY_ID: ${DATA_ENCRYPTION_KEY_ID:-default}
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    environment:
+      NODE_ENV: production
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10.0-alpine
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

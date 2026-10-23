@@ -1,0 +1,8 @@
+phases:
+  - {until_week: 26, every_days: 7}
+  - {until_week: 52, every_days: 14}
+  - {until_week: 104, every_days: 30}
+  - {until_week: null, every_days: 60}
+high_risk_every_days: 7
+grace_hours: 48
+target_minutes: [5, 8]
