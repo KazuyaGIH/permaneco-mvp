@@ -4,7 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
-import { replaceLatestUserMessage, type ChatMessage } from "@/lib/chat-state";
+import {
+  replaceLatestUserMessage,
+  restoreConversationMessages,
+  type ChatMessage,
+} from "@/lib/chat-state";
 import { formatPlanValue, type FormattedPlanNode } from "@/lib/plan-format";
 import { safeLink } from "@/lib/safe-links";
 
@@ -121,7 +125,23 @@ export default function StudentExperience() {
       setAgeConfirmed(nextConsents.age_confirmed);
       setRiskAccepted(nextConsents.accepted.risk_protocol);
       if (nextConsents.chat_allowed) {
-        await Promise.all([loadPlan(), loadMemories()]);
+        const [activeResponse] = await Promise.all([
+          apiFetch("/api/chat/conversations/active"),
+          loadPlan(),
+          loadMemories(),
+        ]);
+        if (activeResponse.ok) {
+          const data = (await activeResponse.json()) as {
+            conversation: null | {
+              id: string;
+              messages: Array<{ role: string; content: string }>;
+            };
+          };
+          if (data.conversation) {
+            setConversationId(data.conversation.id);
+            setMessages(restoreConversationMessages(data.conversation.messages));
+          }
+        }
       }
     }
     void load();

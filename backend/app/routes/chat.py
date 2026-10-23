@@ -48,6 +48,26 @@ def _get_owned_conversation(db: Session, user: User, conversation_id: uuid.UUID)
     return conversation
 
 
+def _conversation_data(db: Session, conversation: Conversation) -> dict:
+    messages = db.scalars(
+        select(Message)
+        .where(
+            Message.conversation_id == conversation.id,
+            Message.role.in_(("user", "assistant")),
+        )
+        .order_by(Message.created_at)
+    )
+    return {
+        "kind": conversation.kind,
+        "channel": conversation.channel,
+        "ended_at": conversation.ended_at,
+        "messages": [
+            {"role": message.role, "content": message.content, "created_at": message.created_at}
+            for message in messages
+        ],
+    }
+
+
 @router.post("/conversations", dependencies=[Depends(require_csrf)])
 def create_conversation(
     payload: ConversationCreate,
@@ -72,6 +92,30 @@ def create_conversation(
     return {"id": str(conversation.id), "kind": conversation.kind, "channel": conversation.channel}
 
 
+@router.get("/conversations/active")
+def get_active_conversation(
+    user: User = Depends(require_role("student")),
+    db: Session = Depends(get_db),
+) -> dict:
+    conversation = db.scalar(
+        select(Conversation)
+        .where(
+            Conversation.student_id == user.id,
+            Conversation.ended_at.is_(None),
+        )
+        .order_by(Conversation.created_at.desc())
+        .limit(1)
+    )
+    if conversation is None:
+        return {"conversation": None}
+    return {
+        "conversation": {
+            "id": str(conversation.id),
+            **_conversation_data(db, conversation),
+        }
+    }
+
+
 @router.get("/conversations/{conversation_id}")
 def get_conversation(
     conversation_id: uuid.UUID,
@@ -79,20 +123,7 @@ def get_conversation(
     db: Session = Depends(get_db),
 ) -> dict:
     conversation = _get_owned_conversation(db, user, conversation_id)
-    messages = db.scalars(
-        select(Message)
-        .where(Message.conversation_id == conversation.id)
-        .order_by(Message.created_at)
-    )
-    return {
-        "kind": conversation.kind,
-        "channel": conversation.channel,
-        "ended_at": conversation.ended_at,
-        "messages": [
-            {"role": message.role, "content": message.content, "created_at": message.created_at}
-            for message in messages
-        ],
-    }
+    return _conversation_data(db, conversation)
 
 
 @router.post(

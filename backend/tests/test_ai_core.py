@@ -998,6 +998,110 @@ def test_conversation_and_plan_routes_are_student_scoped(client, db_session, mon
     assert client.get(f"/api/chat/conversations/{proposal.id}").status_code == 404
 
 
+def test_active_conversation_returns_latest_open_conversation_and_ordered_messages(
+    client, db_session
+):
+    student = create_user(db_session, "active-a@example.com", "student", "Ana")
+    older = Conversation(
+        student_id=student.id,
+        kind="livre",
+        channel="texto",
+        created_at=FIXED_NOW,
+    )
+    active = Conversation(
+        student_id=student.id,
+        kind="boas_vindas",
+        channel="texto",
+        created_at=FIXED_NOW + timedelta(seconds=1),
+    )
+    db_session.add_all([older, active])
+    db_session.flush()
+    db_session.add_all(
+        [
+            Message(
+                conversation_id=active.id,
+                role="user",
+                content="Primeira mensagem",
+                created_at=FIXED_NOW,
+            ),
+            Message(
+                conversation_id=active.id,
+                role="tool",
+                content="Resultado interno",
+                created_at=FIXED_NOW + timedelta(seconds=1),
+            ),
+            Message(
+                conversation_id=active.id,
+                role="assistant",
+                content="Resposta",
+                created_at=FIXED_NOW + timedelta(seconds=2),
+            ),
+        ]
+    )
+    db_session.commit()
+    login(client, student.email)
+
+    response = client.get("/api/chat/conversations/active")
+    assert response.status_code == 200
+    conversation = response.json()["conversation"]
+    assert conversation["id"] == str(active.id)
+    assert conversation["kind"] == "boas_vindas"
+    assert [(message["role"], message["content"]) for message in conversation["messages"]] == [
+        ("user", "Primeira mensagem"),
+        ("assistant", "Resposta"),
+    ]
+
+    detail_response = client.get(f"/api/chat/conversations/{active.id}")
+    assert detail_response.status_code == 200
+    assert [message["role"] for message in detail_response.json()["messages"]] == [
+        "user",
+        "assistant",
+    ]
+
+
+def test_active_conversation_returns_null_when_only_conversations_are_ended(client, db_session):
+    student = create_user(db_session, "ended@example.com", "student", "Ana")
+    db_session.add(
+        Conversation(
+            student_id=student.id,
+            kind="livre",
+            channel="texto",
+            ended_at=FIXED_NOW,
+        )
+    )
+    db_session.commit()
+    login(client, student.email)
+
+    response = client.get("/api/chat/conversations/active")
+    assert response.status_code == 200
+    assert response.json() == {"conversation": None}
+
+
+def test_active_conversation_is_scoped_to_session_student(client, db_session):
+    owner = create_user(db_session, "active-owner@example.com", "student", "Ana")
+    other = create_user(db_session, "active-other@example.com", "student", "Bia")
+    owned_conversation = Conversation(
+        student_id=owner.id,
+        kind="livre",
+        channel="texto",
+    )
+    db_session.add(owned_conversation)
+    db_session.commit()
+    login(client, other.email)
+
+    response = client.get("/api/chat/conversations/active")
+    assert response.status_code == 200
+    assert response.json() == {"conversation": None}
+
+
+def test_active_conversation_requires_student_role(client, db_session):
+    assert client.get("/api/chat/conversations/active").status_code == 401
+
+    tutor = create_user(db_session, "active-tutor@example.com", "tutor", "Tutor")
+    login(client, tutor.email)
+    assert client.get("/api/chat/conversations/active").status_code == 403
+
+
 def test_proposal_confirmation_requires_csrf_and_only_changes_status(
     client, db_session, monkeypatch
 ):

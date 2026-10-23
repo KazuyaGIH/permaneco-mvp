@@ -1,5 +1,15 @@
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
+export function restoreConversationMessages(
+  messages: Array<{ role: string; content: string }>,
+): ChatMessage[] {
+  const restored: ChatMessage[] = [];
+  for (const { role, content } of messages) {
+    if (role === "user" || role === "assistant") restored.push({ role, content });
+  }
+  return restored;
+}
+
 export function replaceLatestUserMessage(
   messages: ChatMessage[],
   content: string,
