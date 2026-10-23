@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+@theme {
+  --color-night: #030707;
+  --color-sun: #ffe14a;
+  --color-olive: #4b4619;
+  --font-display: "DM Serif Display", serif;
+  --font-sans: "Inter", sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+  background: var(--color-night);
+  color: #f5f3e9;
+  font-family: var(--font-sans);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--color-night);
+  color: #f5f3e9;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 3px solid #ffe14a;
+  outline-offset: 3px;
+}
+
+.page-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 1.25rem;
+}
+
+.panel {
+  width: min(100%, 29rem);
+  padding: clamp(1.5rem, 6vw, 2.5rem);
+  border: 1px solid #777044;
+  border-radius: 1.5rem;
+  background: var(--color-olive);
+  box-shadow: 0 24px 80px #0008;
+}
+
+.display-title {
+  margin: 0 0 0.75rem;
+  color: var(--color-sun);
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 12vw, 3.5rem);
+  font-weight: 400;
+  line-height: 1;
+}
+
+.lead {
+  margin: 0 0 2rem;
+  color: #f5f3e9;
+  line-height: 1.65;
+}
+
+.field-label {
+  display: block;
+  margin: 1rem 0 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.text-input {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #b8b184;
+  border-radius: 0.7rem;
+  background: var(--color-night);
+  color: #fff;
+}
+
+.primary-button {
+  width: 100%;
+  min-height: 3.25rem;
+  margin-top: 1.5rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: var(--color-sun);
+  color: #171502;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.primary-button:hover {
+  background: #fff09a;
+}
+
+.error-message {
+  margin: 1rem 0 0;
+  color: #fff1c1;
+}
+
+.account-card {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border-radius: 0.8rem;
+  background: var(--color-night);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.ia-indicator {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--color-sun);
+  border-radius: 999px;
+  background: var(--color-night);
+  color: var(--color-sun);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.ia-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-sun);
+}
+
+.student-list {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.student-list li {
+  padding: 0.8rem;
+  border: 1px solid #777044;
+  border-radius: 0.65rem;
+}
