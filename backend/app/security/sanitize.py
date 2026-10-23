@@ -12,7 +12,7 @@ class SanitizedMessage:
 _CPF = re.compile(r"(?<!\d)\d{3}\.?\d{3}\.?\d{3}-?\d{2}(?!\d)")
 _RG = re.compile(r"(?<!\d)\d{1,2}\.?\d{3}\.?\d{3}-?[\dXx](?!\d)")
 _CARD = re.compile(r"(?<!\d)(?:\d[ -]?){12,18}\d(?!\d)")
-_EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}(?![\w.-])")
+_EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}(?![\w-]|\.\w)")
 _PHONE = re.compile(
     r"(?<!\d)(?:\+?55[\s().-]?)?(?:\(?\d{2}\)?[\s.-]?)?(?:9\d{4}|\d{4})[\s.-]?\d{4}(?!\d)"
 )

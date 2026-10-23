@@ -89,6 +89,20 @@ def test_redacts_personal_data(value, marker, flag):
     assert result.redaction_flags[flag] is True
 
 
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("... ana.teste@example.com.", "... [e-mail removido]."),
+        ("... ana.teste@example.com,", "... [e-mail removido],"),
+        ("a@b.com.br", "[e-mail removido]"),
+    ],
+)
+def test_redacts_emails_followed_by_punctuation(value, expected):
+    result = sanitize_message(value)
+    assert result.text == expected
+    assert result.redaction_flags["email"] is True
+
+
 def test_card_redaction_requires_luhn():
     result = sanitize_message("4111111111111112")
     assert "[cartão removido]" not in result.text
