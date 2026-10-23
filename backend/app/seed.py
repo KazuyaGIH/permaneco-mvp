@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.clock import DemoClock
 from app.core.config import settings
 from app.db.session import SessionLocal
+from app.knowledge import load_knowledge
 from app.models import (
     AppSetting,
     DemoClockSetting,
@@ -124,6 +125,7 @@ def seed_database(db: Session) -> None:
                 setting_key="checkin_policy", value={"loaded_from": "config/checkin_policy.yaml"}
             )
         )
+    load_knowledge(db)
     db.commit()
 
 

@@ -3,6 +3,7 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
+    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -10,10 +11,12 @@ from sqlalchemy import (
     Integer,
     JSON,
     String,
+    Text,
     UniqueConstraint,
     Uuid,
     func,
 )
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -94,6 +97,8 @@ class Conversation(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     kind: Mapped[str] = mapped_column(String(24))
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    channel: Mapped[str] = mapped_column(String(16), default="texto", server_default="texto")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -117,8 +122,17 @@ class Memory(Base):
     student_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
+    source_conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("conversations.id", ondelete="SET NULL")
+    )
     content: Mapped[str] = mapped_column(EncryptedText())
+    category: Mapped[str] = mapped_column(String(24), default="rotina", server_default="rotina")
+    is_sensitive: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
 
 class SessionSummary(Base):
@@ -142,6 +156,7 @@ class Plan(Base):
     )
     version: Mapped[int] = mapped_column(Integer)
     content: Mapped[str] = mapped_column(EncryptedText())
+    change_summary: Mapped[str | None] = mapped_column(EncryptedText())
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -153,6 +168,7 @@ class NextStep(Base):
         ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     content: Mapped[str] = mapped_column(EncryptedText())
+    due_text: Mapped[str | None] = mapped_column(EncryptedText())
     completed: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -217,13 +233,54 @@ class TutorAssignment(Base):
 
 class KnowledgeItem(Base):
     __tablename__ = "knowledge_items"
+    __table_args__ = (
+        Index("ix_knowledge_items_search_vector", "search_vector", postgresql_using="gin"),
+    )
 
     id: Mapped[uuid.UUID] = uuid_column()
+    slug: Mapped[str] = mapped_column(String(120), unique=True)
+    kind: Mapped[str] = mapped_column(String(24))
     title: Mapped[str] = mapped_column(String(200))
     source_url: Mapped[str] = mapped_column(String(2048))
-    content: Mapped[str] = mapped_column(EncryptedText())
+    content: Mapped[str] = mapped_column(Text())
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    verified_at: Mapped[date | None] = mapped_column(Date)
+    search_vector: Mapped[str] = mapped_column(
+        TSVECTOR(),
+        Computed(
+            "to_tsvector('portuguese'::regconfig, coalesce(title, '') || ' ' || coalesce(content, ''))",
+            persisted=True,
+        ),
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PlanProposal(Base):
+    __tablename__ = "plan_proposals"
+
+    id: Mapped[uuid.UUID] = uuid_column()
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    section: Mapped[str] = mapped_column(String(24))
+    change: Mapped[str] = mapped_column(EncryptedText())
+    status: Mapped[str] = mapped_column(String(24), default="pending", server_default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class TokenUsage(Base):
+    __tablename__ = "token_usage"
+    __table_args__ = (
+        UniqueConstraint("student_id", "day"),
+        Index("ix_token_usage_student_day", "student_id", "day"),
+    )
+
+    id: Mapped[uuid.UUID] = uuid_column()
+    student_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    day: Mapped[date] = mapped_column(Date)
+    tokens: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class AuditLog(Base):

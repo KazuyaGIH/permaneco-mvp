@@ -16,7 +16,7 @@ test:
 
 lint:
 	$(COMPOSE) exec backend ruff check app tests
-	cd frontend && npm run lint
+	cd frontend && if command -v npm >/dev/null 2>&1; then npm run lint; else bash -c 'source "$$HOME/.nvm/nvm.sh" && nvm use 20.19.2 >/dev/null && npm run lint'; fi
 
 migrate:
 	$(COMPOSE) exec backend alembic upgrade head

@@ -289,9 +289,9 @@ def test_sensitive_free_text_columns_use_encryption():
         RiskAlert.__table__.c.summary,
         RiskAlert.__table__.c.excerpt,
         TutorNote.__table__.c.content,
-        KnowledgeItem.__table__.c.content,
     ]
     assert all(isinstance(column.type, EncryptedText) for column in encrypted_columns)
+    assert not isinstance(KnowledgeItem.__table__.c.content.type, EncryptedText)
 
 
 def test_no_datetime_now_calls_outside_clock_module():

@@ -1,5 +1,5 @@
-import RoleLanding from "../role-landing";
+import StudentExperience from "../student-experience";
 
 export default function StudentPage() {
-  return <RoleLanding role="student" />;
+  return <StudentExperience />;
 }

@@ -1,0 +1,49 @@
+- id: renegociacao_mensalidade_exemplo
+  tipo: auxilio
+  titulo: Exemplo de renegociação de mensalidade
+  conteudo: "[EXEMPLO — substituir por conteúdo verificado] A Faculdade Exemplo EAD pode oferecer um canal de conversa sobre mensalidades em atraso. Este item é fictício e não descreve uma regra ou oferta real. Confirme condições, prazos e disponibilidade diretamente com a instituição."
+  fonte_url: https://example.com/faculdade-exemplo/financeiro
+  verificado_em: null
+  ativo: true
+- id: bolsa_emergencial_exemplo
+  tipo: auxilio
+  titulo: Exemplo de bolsa emergencial
+  conteudo: "[EXEMPLO — substituir por conteúdo verificado] A Faculdade Exemplo EAD pode avaliar pedidos de apoio financeiro emergencial. Este item é fictício; critérios, valores e prazos precisam ser confirmados com a instituição antes de qualquer decisão."
+  fonte_url: https://example.com/faculdade-exemplo/bolsas
+  verificado_em: null
+  ativo: true
+- id: desconto_pontualidade_exemplo
+  tipo: auxilio
+  titulo: Exemplo de desconto por pontualidade
+  conteudo: "[EXEMPLO — substituir por conteúdo verificado] A Faculdade Exemplo EAD pode divulgar condições de pagamento pontual. Este item é fictício e não promete desconto. Consulte o setor financeiro para confirmar regras e datas."
+  fonte_url: https://example.com/faculdade-exemplo/pagamentos
+  verificado_em: null
+  ativo: true
+- id: dicas_estudo_exemplo
+  tipo: estudo
+  titulo: Dicas de estudo em blocos curtos
+  conteudo: "[EXEMPLO — substituir por conteúdo verificado] Uma sugestão geral de estudo é dividir o tempo disponível em blocos curtos, escolher uma tarefa por bloco e reservar alguns minutos para revisar. Adapte a estratégia à sua rotina e confirme orientações acadêmicas com a instituição."
+  fonte_url: https://example.com/faculdade-exemplo/estudos
+  verificado_em: null
+  ativo: true
+- id: caminhos_carreira_exemplo
+  tipo: carreira
+  titulo: Exemplo de exploração de carreira
+  conteudo: "[EXEMPLO — substituir por conteúdo verificado] A pessoa pode mapear atividades de interesse, conversar com profissionais e consultar a coordenação do curso sobre possibilidades de atuação. Este exemplo não garante emprego nem resultado profissional."
+  fonte_url: https://example.com/faculdade-exemplo/carreiras
+  verificado_em: null
+  ativo: true
+- id: canais_institucionais_exemplo
+  tipo: instituicao
+  titulo: Canais para confirmar informações
+  conteudo: "[EXEMPLO — substituir por conteúdo verificado] Para confirmar informações acadêmicas e financeiras, procure a secretaria, a coordenação ou o setor financeiro da Faculdade Exemplo EAD por um canal oficial."
+  fonte_url: https://example.com/faculdade-exemplo/contato
+  verificado_em: null
+  ativo: true
+- id: modelo_conteudo_oficial
+  tipo: instituicao
+  titulo: Modelo inativo para conteúdo oficial
+  conteudo: "[MODELO — preencher somente com informação verificada e fonte oficial. Registrar responsável e data da verificação.]"
+  fonte_url: https://example.com/fonte-oficial-a-substituir
+  verificado_em: null
+  ativo: false

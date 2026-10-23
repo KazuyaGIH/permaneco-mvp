@@ -18,6 +18,9 @@ services:
 
   backend:
     build: ./backend
+    volumes:
+      - ./knowledge:/knowledge:ro
+      - ./config:/config:ro
     environment:
       APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg://${DB_USER:-permaneco}:${DB_PASSWORD:?Configure DB_PASSWORD in .env}@db:5432/${DB_NAME:-permaneco}
@@ -30,7 +33,14 @@ services:
       SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
       LOGIN_LOCK_MINUTES: ${LOGIN_LOCK_MINUTES:-15}
       RETENTION_DAYS: ${RETENTION_DAYS:-90}
-      MAX_DAILY_TOKENS_PER_STUDENT: ${MAX_DAILY_TOKENS_PER_STUDENT:-10000}
+      MAX_DAILY_TOKENS_PER_STUDENT: ${MAX_DAILY_TOKENS_PER_STUDENT:-25000}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      LLM_MODEL_MAIN: ${LLM_MODEL_MAIN:-gemini-3.6-flash}
+      LLM_MODEL_FAST: ${LLM_MODEL_FAST:-gemini-3.5-flash-lite}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ALLOWED_LINK_DOMAINS: ${ALLOWED_LINK_DOMAINS:-cvv.org.br,gov.br,example.com}
     depends_on:
       db:
         condition: service_healthy

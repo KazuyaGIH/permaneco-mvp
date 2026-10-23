@@ -5,8 +5,11 @@ cryptography==50.0.2
 email-validator==2.2.0
 Faker==37.3.0
 fastapi==0.161.1
+google-genai==2.33.0
 httpx==0.28.1
+openai==3.37.0
 pydantic==2.12.5
+PyYAML==6.0.2
 pydantic-settings==2.9.1
 psycopg[binary]==3.2.9
 pytest==9.1.1
