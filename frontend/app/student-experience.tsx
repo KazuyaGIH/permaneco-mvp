@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
+import { formatPlanValue, type FormattedPlanNode } from "@/lib/plan-format";
 import { safeLink } from "@/lib/safe-links";
 
 type Profile = { preferred_name: string; course: string; semester: number };
@@ -26,12 +27,49 @@ type PlanData = {
 type Proposal = { id: string; section: string; change: string };
 
 const sections = ["estudos", "carreira", "financas"] as const;
+const sectionLabels: Record<(typeof sections)[number], string> = {
+  estudos: "Estudos",
+  carreira: "Carreira",
+  financas: "Finanças",
+};
 const studentTabs = [
   { id: "chat", label: "Conversa" },
   { id: "plan", label: "Meu Plano" },
   { id: "memories", label: "O que a Permaneço lembra" },
 ] as const;
 type StudentTab = (typeof studentTabs)[number]["id"];
+
+function PlanNodeView({ node }: { node: FormattedPlanNode }) {
+  if (node.kind === "text") {
+    return (
+      <p>
+        {node.label && <strong>{node.label}: </strong>}
+        {node.text}
+      </p>
+    );
+  }
+
+  return (
+    <section className={node.kind === "list" ? "plan-section" : "plan-group"}>
+      {node.label && <h3>{node.label}</h3>}
+      <ul>
+        {node.items.map((item, index) => (
+          <li key={`${item.kind}-${index}`}>
+            <PlanNodeView node={item} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function PlanContent({ value }: { value: unknown }) {
+  return (
+    <div className="plan-content">
+      <PlanNodeView node={formatPlanValue(value)} />
+    </div>
+  );
+}
 
 export default function StudentExperience() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -157,6 +195,7 @@ export default function StudentExperience() {
         const lines = rawEvent.split("\n");
         const eventName = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
         const data = lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\n");
+        if (eventName === "done" || eventName === "error") setNotice("");
         if (!eventName || !data) return;
         const payload = JSON.parse(data) as { text?: string; message?: string; name?: string; replace?: boolean };
         if (eventName === "delta" && payload.text) {
@@ -184,6 +223,7 @@ export default function StudentExperience() {
       if (buffer) processEvent(buffer);
       await loadPlan();
     } catch (error) {
+      setNotice("");
       const message = error instanceof Error ? error.message : "Ocorreu um erro.";
       setMessages((current) => current.map((item, index) =>
         index === current.length - 1 ? { ...item, content: message } : item,
@@ -333,12 +373,14 @@ export default function StudentExperience() {
                   onClick={() => setSection(item)}
                   aria-pressed={section === item}
                 >
-                  {item}
+                  {sectionLabels[item]}
                 </button>
               ))}
-              <pre className="plan-output">
-                {JSON.stringify(plan?.current?.plan?.[section] ?? "Seu plano ainda está sendo preparado.", null, 2)}
-              </pre>
+              {plan?.current?.plan?.[section] == null ? (
+                <p>Seu plano ainda está sendo preparado.</p>
+              ) : (
+                <PlanContent value={plan.current.plan[section]} />
+              )}
               <p>Confirme informações acadêmicas e financeiras com a instituição.</p>
               {plan?.sources.map((source) => {
                 const href = safeLink(source.source_url);
