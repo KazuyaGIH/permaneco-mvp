@@ -104,6 +104,25 @@ def test_input_is_limited_to_two_thousand_characters():
     assert len(sanitize_message("a" * 2100).text) == 2000
 
 
+def test_pipeline_yields_sanitized_user_message_first(db_session, student_case):
+    _, profile, conversation = student_case
+    raw_cpf = "529.982.247-25"
+    events = list(
+        stream_message(
+            db_session,
+            conversation,
+            profile,
+            f"CPF {raw_cpf}",
+            FakeLLMProvider(stream_responses=["Resposta"]),
+            FixedClock(FIXED_NOW),
+        )
+    )
+
+    assert events[0]["event"] == "user_message"
+    assert "[CPF removido]" in events[0]["data"]["content"]
+    assert raw_cpf not in events[0]["data"]["content"]
+
+
 @pytest.mark.parametrize(
     "value",
     [
@@ -418,6 +437,8 @@ def test_pipeline_streams_safe_text_before_provider_finishes(db_session, student
     stream = stream_message(
         db_session, conversation, profile, "Olá", provider, FixedClock(FIXED_NOW)
     )
+    user_message = next(stream)
+    assert user_message["event"] == "user_message"
     first = next(stream)
     assert first["event"] == "delta"
     assert provider.advanced is False
@@ -599,7 +620,8 @@ def test_daily_token_limit_skips_provider(db_session, student_case, monkeypatch)
             FixedClock(FIXED_NOW),
         )
     )
-    assert events[0]["data"] == FRIENDLY_TOKEN_LIMIT
+    assert events[0]["event"] == "user_message"
+    assert events[1]["data"] == FRIENDLY_TOKEN_LIMIT
     assert events[-1]["event"] == "done"
 
 
@@ -897,9 +919,14 @@ def test_chat_sse_is_encrypted_and_uses_only_session_student(
     response = client.post(
         f"/api/chat/conversations/{conversation_id}/messages",
         headers=_csrf(client),
-        json={"text": "Olá"},
+        json={"text": "CPF 529.982.247-25"},
     )
     assert response.status_code == 200
+    first_event = response.text.strip().split("\n\n", maxsplit=1)[0]
+    assert first_event.startswith("event: user_message\n")
+    user_message = json.loads(first_event.split("data: ", maxsplit=1)[1])
+    assert "[CPF removido]" in user_message["content"]
+    assert "529.982.247-25" not in user_message["content"]
     assert "event: delta" in response.text and "event: done" in response.text
     assert client.get(f"/api/chat/conversations/{conversation_id}").status_code == 200
     assert client.get(f"/api/chat/conversations/{other.id}").status_code == 404

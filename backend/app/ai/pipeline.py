@@ -192,6 +192,7 @@ def stream_message(
         )
     )
     db.commit()
+    yield {"event": "user_message", "data": {"content": sanitized.text}}
 
     if detect_prompt_injection(sanitized.text):
         _record_security_event(db, student_id, "prompt_injection_heuristic")

@@ -130,6 +130,8 @@ def send_message(
             event_name = item["event"]
             if event_name == "delta":
                 data = {"text": item["data"], "replace": item.get("replace", False)}
+            elif event_name == "user_message":
+                data = item["data"]
             elif event_name == "tool":
                 data = {"name": item["name"]}
             elif event_name == "done":

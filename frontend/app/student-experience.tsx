@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
+import { replaceLatestUserMessage, type ChatMessage } from "@/lib/chat-state";
 import { formatPlanValue, type FormattedPlanNode } from "@/lib/plan-format";
 import { safeLink } from "@/lib/safe-links";
 
@@ -15,7 +16,6 @@ type ConsentState = {
   chat_allowed: boolean;
   minor_message: string | null;
 };
-type ChatMessage = { role: "user" | "assistant"; content: string };
 type PlanData = {
   current: null | {
     version: number;
@@ -197,7 +197,13 @@ export default function StudentExperience() {
         const data = lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trim()).join("\n");
         if (eventName === "done" || eventName === "error") setNotice("");
         if (!eventName || !data) return;
-        const payload = JSON.parse(data) as { text?: string; message?: string; name?: string; replace?: boolean };
+        const payload = JSON.parse(data) as {
+          content?: string;
+          text?: string;
+          message?: string;
+          name?: string;
+          replace?: boolean;
+        };
         if (eventName === "delta" && payload.text) {
           assistantText = payload.replace ? payload.text : assistantText + payload.text;
           setMessages((current) => current.map((item, index) =>
@@ -208,6 +214,9 @@ export default function StudentExperience() {
           setMessages((current) => current.map((item, index) =>
             index === current.length - 1 ? { ...item, content: assistantText } : item,
           ));
+        } else if (eventName === "user_message" && typeof payload.content === "string") {
+          const content = payload.content;
+          setMessages((current) => replaceLatestUserMessage(current, content));
         } else if (eventName === "tool") {
           setNotice("A mentora está consultando seus próximos passos.");
         }
