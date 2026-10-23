@@ -116,6 +116,110 @@ a:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.consent-options {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+}
+
+.consent-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border: 1px solid #777044;
+  border-radius: 0.7rem;
+  background: var(--color-olive);
+}
+
+.consent-option input {
+  flex: 0 0 auto;
+  margin-top: 0.3rem;
+  accent-color: var(--color-sun);
+}
+
+.risk-protocol {
+  margin: 1.25rem 0 0.75rem;
+  padding: 0.75rem;
+  border-left: 3px solid var(--color-sun);
+  line-height: 1.7;
+}
+
+.student-tabs {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.student-tab,
+.section-tab {
+  min-height: 2.75rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid #777044;
+  border-radius: 0.7rem;
+  background: var(--color-night);
+  color: #f5f3e9;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.student-tab[aria-selected="true"],
+.section-tab.is-active {
+  border-color: var(--color-sun);
+  background: var(--color-sun);
+  color: #171502;
+}
+
+.student-tab:focus-visible,
+.section-tab:focus-visible,
+.tab-panel:focus-visible {
+  outline: 3px solid var(--color-sun);
+  outline-offset: 3px;
+}
+
+.tab-panel {
+  margin-top: 1rem;
+}
+
+.chat-transcript {
+  display: grid;
+  max-height: min(60vh, 32rem);
+  gap: 0.75rem;
+  overflow-y: auto;
+  padding: 0.25rem;
+  overscroll-behavior: contain;
+}
+
+.chat-bubble {
+  max-width: 90%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #777044;
+  border-radius: 1rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.chat-bubble p {
+  margin: 0.35rem 0 0;
+}
+
+.chat-bubble-user {
+  justify-self: end;
+  border-color: var(--color-sun);
+  background: var(--color-sun);
+  color: #171502;
+}
+
+.chat-bubble-assistant {
+  justify-self: start;
+  background: var(--color-olive);
+}
+
+.plan-output {
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
 .ia-indicator {
   position: fixed;
   right: 1rem;
@@ -150,4 +254,10 @@ a:focus-visible {
   padding: 0.8rem;
   border: 1px solid #777044;
   border-radius: 0.65rem;
+}
+
+@media (min-width: 38rem) {
+  .student-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }

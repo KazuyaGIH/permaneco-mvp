@@ -1,5 +1,6 @@
 from collections import deque
 from collections.abc import Iterable
+from copy import deepcopy
 from typing import Literal
 
 from pydantic import BaseModel
@@ -24,9 +25,11 @@ class FakeLLMProvider(ProviderBase):
         self.stream_responses = deque(stream_responses)
         self.json_responses = deque(json_responses)
         self.down = down
+        self.stream_calls: list[list[ChatMessage]] = []
 
     def stream_chat(self, system: str, messages: list[ChatMessage], tools: list[ToolSpec]):
-        del system, messages, tools
+        del system, tools
+        self.stream_calls.append(deepcopy(messages))
         if self.down:
             raise ProviderUnavailableError("O provedor de IA está indisponível.")
         response = (

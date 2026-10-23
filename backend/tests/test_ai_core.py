@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -443,6 +444,44 @@ def test_tool_calls_are_capped_at_three(db_session, student_case):
     )
 
 
+def test_tool_provider_data_round_trips_to_next_provider_request(db_session, student_case):
+    student, profile, conversation = student_case
+    provider_data = {"thought_signature": b"opaque-signature"}
+    provider = FakeLLMProvider(
+        stream_responses=[
+            [
+                ToolCall(
+                    "search_knowledge",
+                    {"query": "apoio"},
+                    "call-1",
+                    provider_data=provider_data,
+                )
+            ],
+            "Resposta segura.",
+        ]
+    )
+
+    events = list(
+        stream_message(db_session, conversation, profile, "apoio", provider, FixedClock(FIXED_NOW))
+    )
+
+    second_round_messages = provider.stream_calls[1]
+    assistant_message = next(
+        message for message in second_round_messages if message.get("role") == "assistant"
+    )
+    assert assistant_message["tool_calls"][0]["provider_data"] == provider_data
+    assert all("provider_data" not in event for event in events)
+    assert (
+        db_session.scalar(
+            select(Message).where(
+                Message.conversation_id == conversation.id,
+                Message.role == "assistant",
+            )
+        ).content
+        == "Resposta segura."
+    )
+
+
 def test_pipeline_provider_failure_preserves_student_message(db_session, student_case):
     student, profile, conversation = student_case
     events = list(
@@ -464,6 +503,61 @@ def test_pipeline_provider_failure_preserves_student_message(db_session, student
             Message.conversation_id == conversation.id, Message.role == "assistant"
         )
     )
+
+
+def test_pipeline_logs_provider_status_without_error_content(db_session, student_case, caplog):
+    class ProviderAPIError(Exception):
+        code = 400
+        status = "INVALID_ARGUMENT"
+
+    class FailingProvider:
+        def stream_chat(self, system, messages, tools):
+            raise ProviderUnavailableError("Friendly provider error") from ProviderAPIError(
+                "private prompt and API key"
+            )
+
+    student, profile, conversation = student_case
+    with caplog.at_level(logging.ERROR, logger="app.ai"):
+        events = list(
+            stream_message(
+                db_session,
+                conversation,
+                profile,
+                "Private student message",
+                FailingProvider(),
+                FixedClock(FIXED_NOW),
+            )
+        )
+
+    assert events[-1] == {"event": "error", "data": FRIENDLY_PROVIDER_ERROR}
+    assert "exception_class=ProviderUnavailableError" in caplog.text
+    assert "http_status=400" in caplog.text
+    assert "provider_code=INVALID_ARGUMENT" in caplog.text
+    assert "private prompt and API key" not in caplog.text
+    assert "Private student message" not in caplog.text
+
+
+def test_pipeline_logs_generic_exception_class_without_message(db_session, student_case, caplog):
+    class FailingProvider:
+        def stream_chat(self, system, messages, tools):
+            raise ValueError("sensitive prompt content")
+
+    _, profile, conversation = student_case
+    with caplog.at_level(logging.ERROR, logger="app.ai"):
+        list(
+            stream_message(
+                db_session,
+                conversation,
+                profile,
+                "Private student message",
+                FailingProvider(),
+                FixedClock(FIXED_NOW),
+            )
+        )
+
+    assert "exception_class=ValueError" in caplog.text
+    assert "sensitive prompt content" not in caplog.text
+    assert "Private student message" not in caplog.text
 
 
 def test_daily_token_limit_skips_provider(db_session, student_case, monkeypatch):

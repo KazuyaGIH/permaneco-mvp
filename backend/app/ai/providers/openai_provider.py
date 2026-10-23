@@ -34,7 +34,20 @@ class OpenAIProvider(ProviderBase):
         return self.model_fast if model == "fast" else self.model_main
 
     def _messages(self, system: str, messages: list[ChatMessage]) -> list[dict]:
-        return [{"role": "system", "content": system}, *messages]
+        cleaned_messages = []
+        for message in messages:
+            cleaned = {
+                key: value
+                for key, value in message.items()
+                if key not in {"provider_data", "text_parts"}
+            }
+            if isinstance(cleaned.get("tool_calls"), list):
+                cleaned["tool_calls"] = [
+                    {key: value for key, value in call.items() if key != "provider_data"}
+                    for call in cleaned["tool_calls"]
+                ]
+            cleaned_messages.append(cleaned)
+        return [{"role": "system", "content": system}, *cleaned_messages]
 
     def _tools(self, tools: list[ToolSpec]) -> list[dict]:
         return [

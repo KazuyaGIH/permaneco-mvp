@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { FormEvent, KeyboardEvent } from "react";
 
 import { apiFetch } from "@/lib/api";
 import { safeLink } from "@/lib/safe-links";
@@ -26,6 +26,12 @@ type PlanData = {
 type Proposal = { id: string; section: string; change: string };
 
 const sections = ["estudos", "carreira", "financas"] as const;
+const studentTabs = [
+  { id: "chat", label: "Conversa" },
+  { id: "plan", label: "Meu Plano" },
+  { id: "memories", label: "O que a Permaneço lembra" },
+] as const;
+type StudentTab = (typeof studentTabs)[number]["id"];
 
 export default function StudentExperience() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -41,9 +47,10 @@ export default function StudentExperience() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [memories, setMemories] = useState<{ id: string; category: string; content: string }[]>([]);
   const [section, setSection] = useState<(typeof sections)[number]>("estudos");
-  const [tab, setTab] = useState<"chat" | "plan" | "memories">("chat");
+  const [tab, setTab] = useState<StudentTab>("chat");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const chatTranscriptRef = useRef<HTMLDivElement | null>(null);
 
   const loadPlan = useCallback(async () => {
     const [planResponse, proposalResponse] = await Promise.all([
@@ -84,6 +91,13 @@ export default function StudentExperience() {
       active = false;
     };
   }, [loadMemories, loadPlan]);
+
+  useEffect(() => {
+    const transcript = chatTranscriptRef.current;
+    if (tab === "chat" && transcript) {
+      transcript.scrollTop = transcript.scrollHeight;
+    }
+  }, [messages, tab]);
 
   async function saveConsents(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -198,6 +212,30 @@ export default function StudentExperience() {
     await loadMemories();
   }
 
+  function selectTab(nextTab: StudentTab) {
+    setTab(nextTab);
+    if (nextTab === "plan") void loadPlan();
+    if (nextTab === "memories") void loadMemories();
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const selectedIndex = studentTabs.findIndex((item) => item.id === tab);
+    let nextIndex = selectedIndex;
+    if (event.key === "ArrowRight") nextIndex = (selectedIndex + 1) % studentTabs.length;
+    if (event.key === "ArrowLeft") {
+      nextIndex = (selectedIndex - 1 + studentTabs.length) % studentTabs.length;
+    }
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = studentTabs.length - 1;
+    if (nextIndex === selectedIndex) return;
+
+    event.preventDefault();
+    const nextTab = studentTabs[nextIndex];
+    if (!nextTab) return;
+    selectTab(nextTab.id);
+    document.getElementById(`student-tab-${nextTab.id}`)?.focus();
+  }
+
   return (
     <main className="page-shell">
       <section className="panel" aria-labelledby="student-title">
@@ -212,63 +250,122 @@ export default function StudentExperience() {
           <form className="account-card" onSubmit={saveConsents}>
             <h2>Antes de começar</h2>
             <p>Suas mensagens ficam protegidas. A mentora usa IA e não substitui o apoio da instituição.</p>
-            <label><input type="checkbox" checked={ageConfirmed} onChange={(event) => setAgeConfirmed(event.target.checked)} /> Tenho 18 anos ou mais.</label>
-            <label><input type="checkbox" checked={memoryAccepted} onChange={(event) => setMemoryAccepted(event.target.checked)} /> Aceito memórias opcionais para retomar conversas.</label>
-            <label><input type="checkbox" checked={voiceAccepted} onChange={(event) => setVoiceAccepted(event.target.checked)} /> Aceito o uso opcional de voz.</label>
-            <p>{consents?.texts.risk_protocol.text}</p>
-            <label><input type="checkbox" checked={riskAccepted} onChange={(event) => setRiskAccepted(event.target.checked)} /> Li e entendi o protocolo de risco.</label>
+            <div className="consent-options">
+              <label className="consent-option">
+                <input type="checkbox" checked={ageConfirmed} onChange={(event) => setAgeConfirmed(event.target.checked)} />
+                Tenho 18 anos ou mais.
+              </label>
+              <label className="consent-option">
+                <input type="checkbox" checked={memoryAccepted} onChange={(event) => setMemoryAccepted(event.target.checked)} />
+                Aceito memórias opcionais para retomar conversas.
+              </label>
+              <label className="consent-option">
+                <input type="checkbox" checked={voiceAccepted} onChange={(event) => setVoiceAccepted(event.target.checked)} />
+                Aceito o uso opcional de voz.
+              </label>
+            </div>
+            <p className="risk-protocol">{consents?.texts.risk_protocol.text}</p>
+            <label className="consent-option">
+              <input type="checkbox" checked={riskAccepted} onChange={(event) => setRiskAccepted(event.target.checked)} />
+              Li e entendi o protocolo de risco.
+            </label>
             <button className="primary-button" type="submit" disabled={busy || !ageConfirmed || !riskAccepted}>Entendi e continuar</button>
           </form>
         ) : (
           <>
-            <div className="account-card" role="tablist" aria-label="Área do estudante">
-              <button type="button" onClick={() => setTab("chat")}>Conversa</button>
-              <button type="button" onClick={() => { setTab("plan"); void loadPlan(); }}>Meu Plano</button>
-              <button type="button" onClick={() => { setTab("memories"); void loadMemories(); }}>O que a Permaneço lembra</button>
+            <div className="student-tabs" role="tablist" aria-label="Área do estudante" onKeyDown={handleTabKeyDown}>
+              {studentTabs.map((item) => (
+                <button
+                  key={item.id}
+                  id={`student-tab-${item.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === item.id}
+                  aria-controls={`student-panel-${item.id}`}
+                  tabIndex={tab === item.id ? 0 : -1}
+                  className="student-tab"
+                  onClick={() => selectTab(item.id)}
+                >
+                  {item.label}
+                </button>
+              ))}
             </div>
-            {tab === "chat" && (
-              <div className="account-card">
-                <div aria-live="polite">
-                  {messages.map((message, index) => (
-                    <p key={`${index}-${message.role}`}><strong>{message.role === "user" ? "Você" : "Permaneço (IA)"}:</strong> {message.content}</p>
-                  ))}
-                </div>
-                <form onSubmit={sendMessage}>
-                  <label className="field-label" htmlFor="chat-message">Sua mensagem</label>
-                  <textarea id="chat-message" maxLength={2000} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={busy} />
-                  <button className="primary-button" type="submit" disabled={busy || !draft.trim()}>Enviar</button>
-                  {conversationId && <button type="button" onClick={endConversation}>Encerrar conversa</button>}
-                </form>
-              </div>
-            )}
-            {tab === "plan" && (
-              <div className="account-card">
-                <h2>Meu Plano</h2>
-                {sections.map((item) => <button key={item} type="button" onClick={() => setSection(item)} aria-pressed={section === item}>{item}</button>)}
-                <pre>{JSON.stringify(plan?.current?.plan?.[section] ?? "Seu plano ainda está sendo preparado.", null, 2)}</pre>
-                <p>Confirme informações acadêmicas e financeiras com a instituição.</p>
-                {plan?.sources.map((source) => {
-                  const href = safeLink(source.source_url);
-                  return href ? <p key={source.slug}><a href={href} rel="noreferrer">{source.title} — confirmar com a instituição</a></p> : null;
-                })}
-                {proposals.map((proposal) => (
-                  <div key={proposal.id}>
-                    <p>Proposta de {proposal.section}: {proposal.change}</p>
-                    <button type="button" onClick={() => respondToProposal(proposal.id, "confirm")}>Confirmar</button>
-                    <button type="button" onClick={() => respondToProposal(proposal.id, "reject")}>Rejeitar</button>
+            <div
+              id="student-panel-chat"
+              role="tabpanel"
+              aria-labelledby="student-tab-chat"
+              tabIndex={0}
+              hidden={tab !== "chat"}
+              className="account-card tab-panel"
+            >
+              <div ref={chatTranscriptRef} className="chat-transcript" aria-live="polite">
+                {messages.map((message, index) => (
+                  <div
+                    key={`${index}-${message.role}`}
+                    className={`chat-bubble chat-bubble-${message.role}`}
+                  >
+                    <strong>{message.role === "user" ? "Você" : "Permaneço (IA)"}</strong>
+                    <p>{message.content}</p>
                   </div>
                 ))}
               </div>
-            )}
-            {tab === "memories" && (
-              <div className="account-card">
-                <h2>O que a Permaneço lembra de mim</h2>
-                {memories.map((memory) => (
-                  <p key={memory.id}>{memory.content} <button type="button" onClick={() => forgetMemory(memory.id)}>Apagar</button></p>
-                ))}
-                {!memories.length && <p>Nenhuma memória ativa.</p>}
-              </div>
-            )}
+              <form onSubmit={sendMessage}>
+                <label className="field-label" htmlFor="chat-message">Sua mensagem</label>
+                <textarea id="chat-message" maxLength={2000} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={busy} />
+                <button className="primary-button" type="submit" disabled={busy || !draft.trim()}>Enviar</button>
+                {conversationId && <button type="button" onClick={endConversation}>Encerrar conversa</button>}
+              </form>
+            </div>
+            <div
+              id="student-panel-plan"
+              role="tabpanel"
+              aria-labelledby="student-tab-plan"
+              tabIndex={0}
+              hidden={tab !== "plan"}
+              className="account-card tab-panel"
+            >
+              <h2>Meu Plano</h2>
+              {sections.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={`section-tab${section === item ? " is-active" : ""}`}
+                  onClick={() => setSection(item)}
+                  aria-pressed={section === item}
+                >
+                  {item}
+                </button>
+              ))}
+              <pre className="plan-output">
+                {JSON.stringify(plan?.current?.plan?.[section] ?? "Seu plano ainda está sendo preparado.", null, 2)}
+              </pre>
+              <p>Confirme informações acadêmicas e financeiras com a instituição.</p>
+              {plan?.sources.map((source) => {
+                const href = safeLink(source.source_url);
+                return href ? <p key={source.slug}><a href={href} rel="noreferrer">{source.title} — confirmar com a instituição</a></p> : null;
+              })}
+              {proposals.map((proposal) => (
+                <div key={proposal.id}>
+                  <p>Proposta de {proposal.section}: {proposal.change}</p>
+                  <button type="button" onClick={() => respondToProposal(proposal.id, "confirm")}>Confirmar</button>
+                  <button type="button" onClick={() => respondToProposal(proposal.id, "reject")}>Rejeitar</button>
+                </div>
+              ))}
+            </div>
+            <div
+              id="student-panel-memories"
+              role="tabpanel"
+              aria-labelledby="student-tab-memories"
+              tabIndex={0}
+              hidden={tab !== "memories"}
+              className="account-card tab-panel"
+            >
+              <h2>O que a Permaneço lembra de mim</h2>
+              {memories.map((memory) => (
+                <p key={memory.id}>{memory.content} <button type="button" onClick={() => forgetMemory(memory.id)}>Apagar</button></p>
+              ))}
+              {!memories.length && <p>Nenhuma memória ativa.</p>}
+            </div>
           </>
         )}
       </section>

@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from collections.abc import Callable, Iterator
 from urllib.parse import urlparse
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.ai.context import CANARY, build_context
 from app.ai.providers.base import (
     LLMProvider,
+    ProviderUnavailableError,
     TextDelta,
     ToolCall,
     Usage,
@@ -37,6 +39,45 @@ _MARKDOWN_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 _MARKDOWN_LINK = re.compile(r"\[([^\]]*)\]\((?:<)?([^)\s>]+)(?:>)?(?:\s+['\"][^)]*['\"])?\)")
 _BARE_LINK = re.compile(r"(?i)\b(?:https?://|www\.)[^\s<>()]+")
 MAX_OUTPUT_CHARS = 4000
+logger = logging.getLogger("app.ai")
+
+
+def _provider_error_details(error: Exception) -> tuple[int | None, str | None]:
+    current: BaseException | None = error
+    visited: set[int] = set()
+    http_status = None
+    provider_code = None
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+        response = getattr(current, "response", None)
+        status = getattr(current, "status_code", None) or getattr(response, "status_code", None)
+        code = getattr(current, "code", None)
+        status_label = getattr(current, "status", None)
+        if http_status is None and isinstance(status, int):
+            http_status = status
+        if http_status is None and isinstance(code, int) and 100 <= code <= 599:
+            http_status = code
+        for value in (code, status_label):
+            if (
+                provider_code is None
+                and isinstance(value, str)
+                and re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", value)
+            ):
+                provider_code = value
+        current = current.__cause__ or current.__context__
+    return http_status, provider_code
+
+
+def _message_for_token_estimate(message: dict) -> dict:
+    cleaned = {
+        key: value for key, value in message.items() if key not in {"provider_data", "text_parts"}
+    }
+    if isinstance(cleaned.get("tool_calls"), list):
+        cleaned["tool_calls"] = [
+            {key: value for key, value in call.items() if key != "provider_data"}
+            for call in cleaned["tool_calls"]
+        ]
+    return cleaned
 
 
 def _safe_prefix_length(value: str) -> int:
@@ -180,10 +221,17 @@ def stream_message(
         llm = provider() if callable(provider) else provider
         for _ in range(5):
             round_text: list[str] = []
+            round_text_parts: list[dict] = []
+            has_text_provider_data = False
             calls: list[ToolCall] = []
             for event in llm.stream_chat(system, messages, tool_specs()):
                 if isinstance(event, TextDelta):
                     round_text.append(event.text)
+                    text_part = {"text": event.text}
+                    if event.provider_data is not None:
+                        text_part["provider_data"] = event.provider_data
+                        has_text_provider_data = True
+                    round_text_parts.append(text_part)
                     all_text.append(event.text)
                     stream_buffer += event.text
                     raw_output = "".join(all_text)
@@ -222,6 +270,7 @@ def stream_message(
                             "name": call.name,
                             "arguments": json.dumps(call.args, ensure_ascii=False),
                         },
+                        "provider_data": call.provider_data,
                     }
                 )
                 tool_messages.append(
@@ -233,16 +282,14 @@ def stream_message(
                     }
                 )
                 yield {"event": "tool", "name": call.name}
-            messages.extend(
-                [
-                    {
-                        "role": "assistant",
-                        "content": "".join(round_text) or None,
-                        "tool_calls": assistant_calls,
-                    },
-                    *tool_messages,
-                ]
-            )
+            assistant_message = {
+                "role": "assistant",
+                "content": "".join(round_text) or None,
+                "tool_calls": assistant_calls,
+            }
+            if has_text_provider_data:
+                assistant_message["text_parts"] = round_text_parts
+            messages.extend([assistant_message, *tool_messages])
             db.flush()
         output = "".join(all_text)
         if CANARY in output:
@@ -254,7 +301,17 @@ def stream_message(
             output = "Estou aqui com você. Qual é o próximo passo que parece possível hoje?"
         if input_tokens == 0 and output_tokens == 0:
             input_tokens = max(
-                1, (len(system) + len(json.dumps(messages, ensure_ascii=False))) // 4
+                1,
+                (
+                    len(system)
+                    + len(
+                        json.dumps(
+                            [_message_for_token_estimate(message) for message in messages],
+                            ensure_ascii=False,
+                        )
+                    )
+                )
+                // 4,
             )
             output_tokens = max(1, len(output) // 4)
         _add_usage(db, student_id, today, input_tokens + output_tokens)
@@ -267,6 +324,14 @@ def stream_message(
                 "replace": start == 0,
             }
         yield {"event": "done", "data": {"tokens": input_tokens + output_tokens}}
-    except Exception:
+    except Exception as error:
+        log_fields = [f"exception_class={type(error).__name__}"]
+        if isinstance(error, ProviderUnavailableError):
+            http_status, provider_code = _provider_error_details(error)
+            if http_status is not None:
+                log_fields.append(f"http_status={http_status}")
+            if provider_code is not None:
+                log_fields.append(f"provider_code={provider_code}")
+        logger.error("AI stream failed %s", " ".join(log_fields))
         db.rollback()
         yield {"event": "error", "data": FRIENDLY_PROVIDER_ERROR}

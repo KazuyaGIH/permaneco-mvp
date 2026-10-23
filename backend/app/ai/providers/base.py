@@ -10,6 +10,7 @@ from pydantic import BaseModel, ValidationError
 @dataclass(frozen=True)
 class TextDelta:
     text: str
+    provider_data: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,7 @@ class ToolCall:
     name: str
     args: dict[str, Any]
     call_id: str | None = None
+    provider_data: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
