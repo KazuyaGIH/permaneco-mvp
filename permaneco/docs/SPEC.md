@@ -2,7 +2,7 @@
 
 Você vai construir, do zero, o MVP funcional da **Permaneço**: uma mentora de IA com memória que acompanha calouros de cursos EAD de instituições privadas para reduzir a evasão no início do curso. É para a demo de um hackathon, mas precisa ser software de verdade: roda de ponta a ponta com dados sintéticos, tem testes automatizados e trata segurança e privacidade como requisito.
 
-**Repositório:** `<<PREENCHER: usuario/permaneco-mvp>>` (criado vazio, só com README)
+**Repositório:** `KazuyaGIH/datathon-impacta-banana-date` (o app fica na pasta `permaneco/`)
 
 ## 0. Como trabalhar (leia antes de tudo)
 

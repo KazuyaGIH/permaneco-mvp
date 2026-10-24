@@ -12,6 +12,7 @@ services:
     plan: free
     region: virginia
     branch: main
+    rootDir: permaneco
     dockerContext: .
     dockerfilePath: ./backend/Dockerfile.render
     healthCheckPath: /api/health
@@ -67,6 +68,7 @@ services:
     plan: free
     region: virginia
     branch: main
+    rootDir: permaneco
     dockerContext: ./frontend
     dockerfilePath: ./frontend/Dockerfile
     healthCheckPath: /

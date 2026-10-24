@@ -1,84 +1,41 @@
-# Permaneço
+# Datathon Impacta.dev 2026 — Time BANANA DATE
 
-MVP da Permaneço, uma mentora de IA com memória que acompanha calouros de cursos EAD para reduzir a evasão no início do curso. Usa somente dados sintéticos.
+**Tema:** desistência no ensino superior brasileiro. De 2020 a 2024, a taxa anual de desistência subiu de 17,1% para 22,6%, e quase toda essa piora (5,4 dos 5,5 p.p.) veio do EAD privado.
 
-O MVP inclui login com papéis, consentimento, chat com IA em tempo real (Gemini, modelos gratuitos), remoção automática de CPF e e-mail, bloqueio de prompt injection, plano de estudos/carreira/finanças e memórias que o aluno vê e apaga.
+**Resposta do time:** a **Permaneço**, uma mentora de IA com memória que acompanha calouros do EAD privado no começo do curso, quando a maior parte da desistência acontece.
 
-## Requisitos
+Time: Fernando Graminholi, Gustavo Hassui, Murilo Maeda e Tamara Maia.
 
-- Docker Desktop (ou Docker Engine com Compose)
-- Uma chave gratuita do Gemini: <https://aistudio.google.com/apikey>
+## O que tem neste repositório
 
-## Rodar localmente
+| Pasta | Conteúdo |
+|---|---|
+| [`datathon/`](datathon/) | A análise de dados: notebook com todas as contas, apresentação em PDF e as colas de perguntas para a banca |
+| [`permaneco/`](permaneco/) | O app da Permaneço (MVP funcional): backend, frontend, Docker e documentação técnica |
+| [`permaneco/docs/MANUAL.md`](permaneco/docs/MANUAL.md) | Manual de uso: como instalar, entrar e testar cada funcionalidade |
 
-### Linux/macOS
+## O que os dados mostram
 
-1. Execute `make setup` para criar `.env` com uma chave aleatória local.
-2. Preencha `GEMINI_API_KEY=` no `.env`.
-3. Execute `make up`.
-4. Execute `make seed` e abra <http://localhost:8080>.
+Resumo das cinco afirmações testadas no notebook (Censo da Educação Superior 2020–2024, dados por curso):
 
-### Windows (PowerShell)
+1. **O aluno está no EAD privado.** Em 2024, mais da metade dos vínculos eram do EAD privado, que também tem a maior desistência (28,9% em 2024).
+2. **A desistência acontece no começo.** No EAD privado, 43% da turma já saiu até o fim do ano seguinte ao ingresso; 64% de toda a desistência de seis anos acontece nos dois primeiros.
+3. **Não é só o tipo de faculdade.** Na mesma instituição, o EAD perde cerca de 7,8 p.p. a mais que o presencial.
+4. **Quem é o aluno.** Adulto (74% têm 25 anos ou mais), vindo da escola pública, quase sem apoio financeiro (1% com apoio social).
+5. **O risco é previsível e a escala pede IA.** A perda do primeiro ano não volta; acompanhar 3,26 milhões de calouros por 20 min/mês exigiria cerca de 9 mil tutores em tempo integral, e 54% desses alunos estão em cinco instituições.
 
-```powershell
-git clone https://github.com/KazuyaGIH/permaneco-mvp.git
-cd permaneco-mvp
-$b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); $k = [Convert]::ToBase64String($b)
-(Get-Content .env.example) -replace '^DATA_ENCRYPTION_KEY=$', "DATA_ENCRYPTION_KEY=$k" -replace '^DATA_ENCRYPTION_KEYS=$', "DATA_ENCRYPTION_KEYS={`"demo`":`"$k`"}" | Set-Content .env -Encoding ascii
-notepad .env   # preencha GEMINI_API_KEY= e salve
-docker compose up --build -d
-docker compose exec backend python -m app.seed
-```
+A literatura aponta que o que funciona é acompanhamento ativo e regular (InsideTrack, CUNY ASAP); dinheiro sem acompanhamento e filtro duro no primeiro ano não funcionaram.
 
-Depois abra <http://localhost:8080> e entre com `ana@example.com` / `demo-only-password`.
+## A solução em uma frase
 
-Sem `GEMINI_API_KEY`, o app sobe, mas o chat não responde. A cota gratuita do modelo principal é pequena; quando ela acaba, o app passa sozinho para o modelo de fallback gratuito.
+A Permaneço conversa com o calouro no horário dele, lembra da rotina e dos objetivos, monta um plano de estudos, carreira e finanças que cabe no tempo real do aluno e avisa um tutor humano quando o caso pede intervenção.
 
-O Compose publica somente em `localhost`. O ambiente local usa HTTP para simplificar a demonstração. `COOKIE_SECURE=false` só deve ser usado nesse ambiente; ambientes externos devem usar TLS e `COOKIE_SECURE=true`.
+## Como testar rápido
 
-## Contas de demonstração
+1. Leia a apresentação: [`datathon/Permaneco-Estudo-e-Proposta.pdf`](datathon/Permaneco-Estudo-e-Proposta.pdf).
+2. Abra o notebook no Colab: [`datathon/BANANA_DATE_Permanencia_EAD_analises.ipynb`](datathon/BANANA_DATE_Permanencia_EAD_analises.ipynb). Ele baixa os dados sozinho.
+3. Rode o app seguindo o [manual](permaneco/docs/MANUAL.md). Precisa de Docker e de uma chave gratuita do Gemini.
 
-As contas são criadas por `make seed`, somente quando `DEMO_MODE=true`. A senha é definida por `DEMO_PASSWORD` no arquivo `.env`; o valor de exemplo é deliberadamente conhecido e não deve ser reutilizado fora da demonstração.
+## Stack do app
 
-- `ana@example.com` — estudante
-- `bruno@example.com` — estudante
-- `tutor1@example.com` — tutor
-- `admin@example.com` — administração
-
-## Deploy público (Render)
-
-1. Entre no Render com sua conta GitHub e conceda acesso ao repositório `KazuyaGIH/permaneco-mvp`.
-2. No painel, escolha **New → Blueprint**, selecione este repositório e a branch `main`.
-3. Ao sincronizar o Blueprint, preencha `GEMINI_API_KEY` e `DEMO_PASSWORD` com os valores da demonstração.
-4. Depois do deploy, abra a URL pública de `permaneco-web`, o serviço destinado aos avaliadores.
-
-O login de estudante é `ana@example.com`; use a senha definida em `DEMO_PASSWORD`. O frontend encaminha `/api/*` ao backend pela URL HTTPS pública do serviço, preservando chamadas same-origin no navegador. O Blueprint não cria worker porque a cadência atual é M3.
-
-No plano gratuito, os serviços web entram em repouso após 15 minutos sem tráfego e podem levar cerca de um minuto para voltar. O Postgres gratuito expira após 30 dias. A franquia é de 750 horas de instância por mês, compartilhadas no workspace.
-
-## Roteiro de avaliação
-
-1. Entre como `bruno@example.com` para ver o consentimento: maioridade, memória e voz opcionais e protocolo de risco.
-2. Entre como `ana@example.com` e converse com a mentora na aba **Conversa**. Teste digitar um CPF ou e-mail fictício: ele aparece como `[removido]`.
-3. Clique em **Encerrar conversa**. A mentora gera resumo, memórias e plano.
-4. Veja **Meu Plano** (Estudos, Carreira, Finanças) e **O que a Permaneço lembra**, onde cada memória pode ser apagada.
-5. Entre como tutor para consultar somente estudantes atribuídos. A conta administrativa lista apenas contas e papéis, sem conteúdo privado.
-
-## Arquitetura
-
-```mermaid
-flowchart LR
-    Browser --> Caddy
-    Caddy -->|/api/*| FastAPI
-    Caddy -->|demais rotas| Next
-    FastAPI --> PostgreSQL
-    Worker --> PostgreSQL
-```
-
-## Limitações
-
-O M1 estabelece autenticação, autorização, persistência, criptografia e execução local. Chat, IA, cadência funcional, painel e fluxos de consentimento completos fazem parte de marcos posteriores. O rate limiting é em memória e não é compartilhado entre réplicas.
-
-## Antes de usar dados reais
-
-Use um provedor de IA em plano apropriado e com termos que proíbam treinamento com os dados; avalie transferência internacional conforme a LGPD; produza RIPD; defina a base legal com o encarregado de dados da instituição — consentimento pode não ser livre se o acompanhamento for obrigatório — e valide o protocolo de crise com profissionais de saúde mental e plantão humano. O M1 não deve receber dados reais.
+Next.js (TypeScript) no front, FastAPI (Python) no back, PostgreSQL com dados criptografados, IA pela API do Gemini (modelos gratuitos) e Docker Compose para subir tudo. Detalhes em [`permaneco/README.md`](permaneco/README.md) e [`permaneco/docs/`](permaneco/docs/).
